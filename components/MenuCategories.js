@@ -55,10 +55,9 @@ export default function MenuCategories() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     className="menu-cat-card"
-                    style={{ height: '350px', cursor: 'pointer', position: 'relative', overflow: 'hidden', borderRadius: '24px', border: '2px dashed var(--secondary)' }}
                   >
-                    <div className="menu-cat-overlay" style={{ background: 'linear-gradient(to top, rgba(62, 39, 35, 0.8), transparent)', position: 'absolute', inset: 0, zIndex: 10 }}></div>
-                    <div className="menu-cat-bg" style={{ position: 'absolute', inset: 0, backgroundColor: '#fff' }}>
+                    <div className="menu-cat-overlay"></div>
+                    <div className="menu-cat-bg">
                       <Image 
                         src={section.image} 
                         alt={section.category} 
@@ -67,16 +66,7 @@ export default function MenuCategories() {
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                       />
                     </div>
-                    <div style={{ 
-                      position: 'absolute', 
-                      bottom: '0', 
-                      left: '0', 
-                      right: '0', 
-                      zIndex: 20,
-                      background: 'linear-gradient(to top, rgba(62, 39, 35, 0.95), rgba(62, 39, 35, 0.7))',
-                      padding: '1.5rem 1.25rem',
-                      borderTop: '2px dashed var(--secondary)'
-                    }}>
+                    <div className="menu-cat-info">
                       <h3 className="script-font" style={{ fontSize: '1.75rem', fontWeight: 'bold', color: 'var(--neon-gold)', letterSpacing: '0.5px', textShadow: '2px 2px 4px rgba(0,0,0,0.4)', marginBottom: '0.5rem', lineHeight: '1.2' }}>{section.category}</h3>
                       <div className="flex items-center gap-2" style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--neon-gold)' }}>
                         <span>Explore Section</span>
