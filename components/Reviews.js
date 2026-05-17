@@ -135,7 +135,7 @@ const ReviewCard = ({ review, index }) => (
     <StarRating rating={review.rating} />
 
     <p style={{ color: 'var(--foreground)', lineHeight: '1.65', fontSize: '0.95rem', opacity: 0.85 }}>
-      "{review.text}"
+      &ldquo;{review.text}&rdquo;
     </p>
   </motion.div>
 );

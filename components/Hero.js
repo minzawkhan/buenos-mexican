@@ -73,16 +73,64 @@ export default function Hero() {
           initial={{ opacity: 0, y: 20, z: -50 }}
           animate={{ opacity: 1, y: 0, z: 0 }}
           transition={{ delay: 0.8, duration: 0.8 }}
-          className="flex flex-col md-flex-row gap-4 justify-center items-center w-full"
+          className="flex flex-col md:flex-row gap-4 justify-center items-center w-full"
           style={{ transform: 'translateZ(60px)' }}
         >
-          <button className="primary-btn" style={{ width: '90%', maxWidth: '320px' }} onClick={() => document.getElementById('booking').scrollIntoView()}>
+          <motion.button 
+            className="primary-btn" 
+            whileHover={{ 
+              scale: 1.05, 
+              boxShadow: '0 10px 25px rgba(139, 28, 28, 0.4)' 
+            }}
+            whileTap={{ scale: 0.95 }}
+            style={{ width: '90%', maxWidth: '320px', cursor: 'pointer' }} 
+            onClick={() => document.getElementById('booking').scrollIntoView()}
+          >
             Reserve A Table
-          </button>
+          </motion.button>
+          
           <a href="https://r.grab.com/o/Zn6bI3Ar" target="_blank" rel="noopener noreferrer" style={{ width: '90%', maxWidth: '320px' }}>
-            <button className="outline-btn" style={{ width: '100%', backgroundColor: 'rgba(0,0,0,0.4)', color: '#fff', borderColor: 'var(--primary)', cursor: 'pointer' }}>
-              Order on Grab
-            </button>
+            <motion.button 
+              className="outline-btn" 
+              whileHover={{ 
+                scale: 1.05,
+                background: 'linear-gradient(135deg, #00C853 0%, #009624 100%)',
+                borderColor: '#00C853',
+                color: '#fff',
+                boxShadow: '0 12px 35px rgba(0, 200, 83, 0.6)'
+              }}
+              whileTap={{ scale: 0.95 }}
+              animate={{ 
+                boxShadow: ['0 4px 15px rgba(0, 177, 79, 0.3)', '0 10px 30px rgba(0, 177, 79, 0.6)', '0 4px 15px rgba(0, 177, 79, 0.3)']
+              }}
+              transition={{
+                boxShadow: { repeat: Infinity, duration: 2, ease: "easeInOut" }
+              }}
+              style={{ 
+                width: '100%', 
+                background: 'linear-gradient(135deg, #00B14F 0%, #00873C 100%)',
+                color: '#fff', 
+                borderColor: '#00B14F', 
+                borderWidth: '2px',
+                borderStyle: 'solid',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                fontWeight: '700',
+                fontSize: '1.125rem',
+                padding: '16px 32px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 15px rgba(0, 177, 79, 0.3)',
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <span style={{ fontSize: '1.4rem' }}>🛵</span>
+                <span>Order on Grab</span>
+              </span>
+            </motion.button>
           </a>
         </motion.div>
 

@@ -573,3 +573,15 @@ button {
 .quick-menu-swiper .swiper-wrapper {
   transition-timing-function: linear !important;
 }
+
+/* Responsive Salsas Card Layout Tweaks */
+@media (max-width: 767px) {
+  .salsa-card {
+    margin-top: 45px !important;
+    padding-top: 3.5rem !important;
+  }
+  .salsa-image-container {
+    margin-top: -5.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+}

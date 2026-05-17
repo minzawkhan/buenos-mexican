@@ -19,7 +19,7 @@ export default function MenuCategories() {
       >
         <div className="flex flex-col md-flex-row justify-between items-center" style={{ marginBottom: '4rem' }}>
           <div>
-            <h2 className="script-font" style={{ fontSize: 'clamp(3rem, 6vw, 5rem)' }}>Our Quick Menu</h2>
+            <h2 className="script-font neon-gold" style={{ fontSize: 'clamp(3rem, 6vw, 5rem)', fontWeight: 'bold' }}>Our Quick Menu</h2>
             <p className="text-gray" style={{ fontSize: '1.1rem', marginTop: '0.5rem', fontWeight: '600', backgroundColor: 'rgba(255, 215, 0, 0.15)', padding: '4px 12px', borderRadius: '4px', display: 'inline-block' }}>
               Swipe to <span className="text-primary">explore</span> or click to jump to a section
             </p>
@@ -67,11 +67,20 @@ export default function MenuCategories() {
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                       />
                     </div>
-                    <div style={{ position: 'absolute', bottom: '2rem', left: '1.5rem', zIndex: 20 }}>
-                      <h3 className="anton-font" style={{ fontSize: '2rem', color: '#fff', textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>{section.category}</h3>
-                      <div className="flex items-center gap-2" style={{ marginTop: '0.75rem', fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', backgroundColor: 'rgba(255, 215, 0, 0.9)', color: 'var(--primary)', padding: '4px 12px', borderRadius: '4px', display: 'inline-flex' }}>
-                        <span>Explore</span>
-                        <span style={{ fontSize: '1rem' }}>→</span>
+                    <div style={{ 
+                      position: 'absolute', 
+                      bottom: '0', 
+                      left: '0', 
+                      right: '0', 
+                      zIndex: 20,
+                      background: 'linear-gradient(to top, rgba(62, 39, 35, 0.95), rgba(62, 39, 35, 0.7))',
+                      padding: '1.5rem 1.25rem',
+                      borderTop: '2px dashed var(--secondary)'
+                    }}>
+                      <h3 className="script-font" style={{ fontSize: '1.75rem', fontWeight: 'bold', color: 'var(--neon-gold)', letterSpacing: '0.5px', textShadow: '2px 2px 4px rgba(0,0,0,0.4)', marginBottom: '0.5rem', lineHeight: '1.2' }}>{section.category}</h3>
+                      <div className="flex items-center gap-2" style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--neon-gold)' }}>
+                        <span>Explore Section</span>
+                        <span style={{ fontSize: '1.1rem' }}>→</span>
                       </div>
                     </div>
                   </motion.div>

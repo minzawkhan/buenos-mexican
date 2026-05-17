@@ -27,12 +27,17 @@ export default function DynamicBackground() {
     const dayName = new Intl.DateTimeFormat('en-US', options).format(today);
     setCurrentDay(dayName);
     
-    if (!window.matchMedia('(pointer: fine)').matches) {
-      setIsMobile(true);
-    }
+    // Break synchronicity to avoid cascading render warning
+    const checkMobile = () => {
+      if (!window.matchMedia('(pointer: fine)').matches) {
+        setIsMobile(true);
+      }
+    };
+    
+    const timeoutId = setTimeout(checkMobile, 0);
+    return () => clearTimeout(timeoutId);
   }, []);
 
-  // Default to a dark generic background before hydration finishes
   const bgImage = currentDay ? dayBackgrounds[currentDay] : '/images/rustic_hero.png';
 
   return (
@@ -47,9 +52,9 @@ export default function DynamicBackground() {
           alt="Daily Special Background" 
           fill 
           priority
+          sizes="100vw"
           style={{ objectFit: 'cover' }} 
         />
-        {/* Dark Overlay for Readability */}
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5))' }}></div>
       </motion.div>
     </div>

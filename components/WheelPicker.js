@@ -16,30 +16,43 @@ export default function WheelPicker({ options, value, onChange, label }) {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const timeoutRef = useRef(null);
+
+  // Sync internal index with prop value
+  useEffect(() => {
+    const index = options.indexOf(value);
+    if (index !== -1 && index !== activeIndex) {
+      setActiveIndex(index);
+      // Ensure the scroll position matches the new value
+      if (containerRef.current) {
+        containerRef.current.scrollTop = index * ITEM_HEIGHT;
+      }
+    }
+  }, [value, options]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    let timeoutId;
-
     const handleScroll = () => {
       const offset = container.scrollTop;
       const index = Math.round(offset / ITEM_HEIGHT);
-      if (index !== activeIndex && index >= 0 && index < options.length) {
+      
+      if (index >= 0 && index < options.length && index !== activeIndex) {
         setActiveIndex(index);
         
         // Debounce the onChange to prevent excessive re-renders in parent
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => {
           onChange(options[index]);
-        }, 100);
+        }, 150);
       }
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       container.removeEventListener('scroll', handleScroll);
-      clearTimeout(timeoutId);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [options, activeIndex, onChange]);
 

@@ -27,34 +27,40 @@ export default function Booking() {
     return dates;
   }, []);
 
-  // Generate Time Options (11:00 to 22:00)
+  // Generate Time Options (12:00 PM to 1:00 AM next day)
   const timeOptions = useMemo(() => {
     const times = [];
-    for (let h = 11; h <= 22; h++) {
+    // 12:00 to 23:30
+    for (let h = 12; h <= 23; h++) {
       times.push(`${h}:00`);
       times.push(`${h}:30`);
     }
+    // 00:00 to 01:00
+    times.push('00:00');
+    times.push('00:30');
+    times.push('01:00');
     return times;
   }, []);
 
-  const partyOptions = ['1', '2', '3', '4', '5', '6', '7', '8', '9+'];
+  const partyOptions = useMemo(() => ['1', '2', '3', '4', '5', '6', '7', '8', '9+'], []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setStatus('loading');
     setErrorMsg('');
 
-    const { error } = await supabase.from('bookings').insert([{
-      name: formData.name,
-      email: formData.email,
-      date: formData.date,
-      time: formData.time,
-      party_size: formData.partySize,
-    }]);
+    // Use RPC for concurrency control and automatic table assignment
+    const { data, error } = await supabase.rpc('create_booking', {
+      p_name: formData.name,
+      p_email: formData.email,
+      p_date: formData.date,
+      p_time: formData.time,
+      p_party_size: formData.partySize,
+    });
 
-    if (error) {
-      console.error('Booking error:', error);
-      setErrorMsg('Something went wrong. Please try again or call us directly.');
+    if (error || (data && data.error)) {
+      console.error('Booking error:', error || data.error);
+      setErrorMsg(data?.error || 'Something went wrong. Please try again or call us directly.');
       setStatus('error');
       return;
     }
@@ -105,7 +111,7 @@ export default function Booking() {
             </motion.div>
           ) : (
             <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 md-grid-cols-2 gap-6" style={{ marginBottom: '2rem' }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ marginBottom: '2rem' }}>
                 <div className="relative">
                   <label className="input-label">Full Name</label>
                   <input required type="text" name="name" value={formData.name} onChange={handleChange} className="input-field" placeholder="John Doe" />
@@ -159,6 +165,7 @@ export default function Booking() {
               )}
 
               <motion.button 
+                suppressHydrationWarning
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 type="submit" 
