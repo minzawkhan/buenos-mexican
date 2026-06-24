@@ -1,80 +1,220 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
+import NewsletterModal from './NewsletterModal';
+
+function useNavTilt() {
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  const rX = useSpring(useTransform(my, [-30, 30], [6, -6]), { stiffness: 380, damping: 30 });
+  const rY = useSpring(useTransform(mx, [-60, 60], [-6, 6]), { stiffness: 380, damping: 30 });
+  return {
+    rX, rY,
+    onMouseMove: (e) => { const r = e.currentTarget.getBoundingClientRect(); mx.set(e.clientX - (r.left + r.width / 2)); my.set(e.clientY - (r.top + r.height / 2)); },
+    onMouseLeave: () => { mx.set(0); my.set(0); },
+  };
+}
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isNewsletterOpen, setIsNewsletterOpen] = useState(false);
+
+  const tilt = useNavTilt();
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
-    };
+    const handleOpenVIP = () => setIsNewsletterOpen(true);
+    window.addEventListener('open-vip-modal', handleOpenVIP);
+    return () => window.removeEventListener('open-vip-modal', handleOpenVIP);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll);
-    // Initial check
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   return (
-    <nav className="navbar" style={{ 
-      zIndex: 100, 
+    <nav className="navbar" style={{
+      zIndex: 100,
       backgroundColor: scrolled ? 'rgba(26, 26, 26, 0.98)' : 'rgba(0, 0, 0, 0.6)',
       borderBottom: scrolled ? '2px dashed var(--primary)' : '1px solid rgba(255,255,255,0.1)',
       padding: scrolled ? '16px 0' : '32px 0',
       color: '#fff',
       transition: 'all 0.4s ease',
-      backdropFilter: 'blur(8px)'
+      backdropFilter: 'blur(8px)',
     }}>
       <div className="flex justify-between items-center" style={{ width: '100%', padding: '0 5%' }}>
-        <a href="/" className="anton-font flex items-center gap-4 lg:gap-10" style={{ fontSize: 'clamp(1.5rem, 5vw, 2.2rem)', color: '#fff', letterSpacing: '1px', textShadow: '0 2px 4px rgba(0,0,0,0.5)', lineHeight: 1 }}>
+        <a href="/" className="anton-font flex items-center gap-2 lg:gap-10" style={{ fontSize: 'clamp(1.2rem, 4.5vw, 2.2rem)', color: '#fff', letterSpacing: '1px', textShadow: '0 2px 4px rgba(0,0,0,0.5)', lineHeight: 1.1 }}>
           <span className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
             <span>Buenos Mexican</span>
             <span className="text-primary" style={{ textShadow: '0 2px 8px rgba(139, 28, 28, 0.4)' }}>Restaurant</span>
           </span>
         </a>
-        
+
         {/* Desktop Menu */}
         <ul className="desktop-menu gap-8 uppercase tracking-widest items-center" style={{ fontSize: '0.8rem', fontWeight: '500', margin: 0 }}>
-          <li><a href="/#home" className="nav-link" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Home</a></li>
-          <li><a href="/menu" className="nav-link" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Menu</a></li>
-          <li><a href="/#booking" className="nav-link" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Booking</a></li>
+          <li><a href="/#home"     className="nav-link" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Home</a></li>
+          <li><a href="/menu"      className="nav-link" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Menu</a></li>
+          <li><a href="/#booking"  className="nav-link" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Booking</a></li>
           <li><a href="/#specials" className="nav-link" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Specials</a></li>
           <li><a href="/#location" className="nav-link" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Location</a></li>
+
+          {/* ── Desktop Subscribe button ── */}
+          <li>
+            {/* Spring pop-in on page load */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.6, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 18, delay: 1.0 }}
+              style={{ perspective: '600px', display: 'inline-block' }}
+            >
+              {/* 3-D tilt wrapper */}
+              <motion.div
+                style={{ rotateX: tilt.rX, rotateY: tilt.rY, transformStyle: 'preserve-3d', display: 'inline-block' }}
+                onMouseMove={tilt.onMouseMove} onMouseLeave={tilt.onMouseLeave}
+              >
+                <motion.button
+                  onClick={() => setIsNewsletterOpen(true)}
+                  whileHover={{ scale: 1.1, y: -3, boxShadow: '0 14px 36px rgba(255,215,0,0.5), 0 0 0 1.5px rgba(255,215,0,0.75)' }}
+                  whileTap={{ scale: 0.92 }}
+                  animate={{
+                    boxShadow: [
+                      '0 2px 10px rgba(255,215,0,0.15)',
+                      '0 8px 24px rgba(255,215,0,0.42)',
+                      '0 2px 10px rgba(255,215,0,0.15)',
+                    ],
+                    borderColor: [
+                      'rgba(255,215,0,0.25)',
+                      'rgba(255,215,0,0.85)',
+                      'rgba(255,215,0,0.25)',
+                    ],
+                  }}
+                  transition={{
+                    boxShadow:   { repeat: Infinity, duration: 2.4, ease: 'easeInOut', delay: 1.6 },
+                    borderColor: { repeat: Infinity, duration: 2.4, ease: 'easeInOut', delay: 1.6 },
+                  }}
+                  style={{
+                    position: 'relative', overflow: 'hidden',
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    background: 'linear-gradient(135deg, #3E2723 0%, #5C2317 50%, #8B1C1C 100%)',
+                    color: '#FFD700',
+                    borderRadius: '50px',
+                    padding: '0.5rem 1.4rem',
+                    fontSize: '0.75rem', fontWeight: 800,
+                    fontFamily: 'var(--font-montserrat)',
+                    border: '1.5px solid rgba(255,215,0,0.25)',
+                    cursor: 'pointer', letterSpacing: '0.05em',
+                    marginLeft: '0.5rem', transformStyle: 'preserve-3d',
+                  }}
+                >
+                  {/* Shimmer sweep */}
+                  <motion.span
+                    style={{ position: 'absolute', top: 0, left: '-80%', width: '55%', height: '100%', background: 'linear-gradient(90deg, transparent, rgba(255,215,0,0.16), transparent)', transform: 'skewX(-20deg)', pointerEvents: 'none' }}
+                    animate={{ left: ['-80%', '160%'] }}
+                    transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut', repeatDelay: 2.2 }}
+                  />
+                  {/* Ambient blob */}
+                  <motion.span
+                    style={{ position: 'absolute', width: '70%', height: '70%', top: '15%', left: '15%', background: 'radial-gradient(circle, rgba(255,215,0,0.06) 0%, transparent 70%)', borderRadius: '50%', pointerEvents: 'none' }}
+                    animate={{ x: ['-20%', '20%', '-20%'], y: ['-15%', '15%', '-15%'] }}
+                    transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut' }}
+                  />
+                  {/* Sparkles twinkle */}
+                  <motion.span
+                    animate={{ rotate: [0, 18, -18, 0], scale: [1, 1.35, 0.85, 1] }}
+                    transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut', delay: 0.6 }}
+                    style={{ display: 'flex' }}
+                  >
+                    <Sparkles size={14} />
+                  </motion.span>
+                  SUBSCRIBE
+                </motion.button>
+              </motion.div>
+            </motion.div>
+          </li>
         </ul>
 
         {/* Mobile Menu Button */}
-        <button className="mobile-menu-btn flex flex-col gap-1.5 z-50 relative ml-auto" onClick={() => setIsOpen(!isOpen)} style={{ padding: '0.75rem', minWidth: '44px', minHeight: '44px', justifyContent: 'center', alignItems: 'center' }}>
+        <button className="mobile-menu-btn flex flex-col gap-1.5 z-50 relative ml-auto" onClick={() => setIsOpen(!isOpen)} aria-label="Toggle navigation menu" aria-expanded={isOpen} style={{ padding: '0.75rem', minWidth: '44px', minHeight: '44px', justifyContent: 'center', alignItems: 'center' }}>
           <span style={{ display: 'block', width: '28px', height: '3px', backgroundColor: '#fff', transition: '0.3s', transform: isOpen ? 'rotate(45deg) translate(6px, 6px)' : 'none' }}></span>
           <span style={{ display: 'block', width: '28px', height: '3px', backgroundColor: '#fff', transition: '0.3s', opacity: isOpen ? 0 : 1 }}></span>
           <span style={{ display: 'block', width: '28px', height: '3px', backgroundColor: '#fff', transition: '0.3s', transform: isOpen ? 'rotate(-45deg) translate(7px, -7px)' : 'none' }}></span>
         </button>
       </div>
 
-      {/* Mobile Menu Overlay (Drawer Style) */}
-      <div style={{ 
-        position: 'fixed', 
-        top: 0, 
-        right: 0, 
-        width: '100%', 
-        height: '100vh', 
-        backgroundColor: 'rgba(26, 26, 26, 0.98)', 
-        zIndex: 40,
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: '2rem', 
-        alignItems: 'center', 
-        justifyContent: 'center',
+      {/* Mobile Drawer */}
+      <div style={{
+        position: 'fixed', top: 0, right: 0, width: '100%', height: '100vh',
+        backgroundColor: 'rgba(26, 26, 26, 0.98)', zIndex: 40,
+        display: 'flex', flexDirection: 'column', gap: '2rem', alignItems: 'center', justifyContent: 'center',
         transition: 'transform 0.4s ease-in-out',
         transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
-        backdropFilter: 'blur(10px)'
+        backdropFilter: 'blur(10px)', overflowY: 'auto', padding: '80px 0 40px 0',
       }}>
-        <a href="/#home" className="nav-link uppercase tracking-widest font-bold text-2xl" onClick={() => setIsOpen(false)} style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Home</a>
-        <a href="/menu" className="nav-link uppercase tracking-widest font-bold text-2xl" onClick={() => setIsOpen(false)} style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Menu</a>
-        <a href="/#booking" className="nav-link uppercase tracking-widest font-bold text-2xl" onClick={() => setIsOpen(false)} style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Booking</a>
+        <a href="/#home"     className="nav-link uppercase tracking-widest font-bold text-2xl" onClick={() => setIsOpen(false)} style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Home</a>
+        <a href="/menu"      className="nav-link uppercase tracking-widest font-bold text-2xl" onClick={() => setIsOpen(false)} style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Menu</a>
+        <a href="/#booking"  className="nav-link uppercase tracking-widest font-bold text-2xl" onClick={() => setIsOpen(false)} style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Booking</a>
         <a href="/#specials" className="nav-link uppercase tracking-widest font-bold text-2xl" onClick={() => setIsOpen(false)} style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Daily Specials</a>
         <a href="/#location" className="nav-link uppercase tracking-widest font-bold text-2xl" onClick={() => setIsOpen(false)} style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Location</a>
+
+        {/* ── Mobile Subscribe button ── */}
+        <motion.button
+          onClick={() => { setIsOpen(false); setIsNewsletterOpen(true); }}
+          whileHover={{ scale: 1.05, y: -3, boxShadow: '0 16px 40px rgba(255,215,0,0.45)' }}
+          whileTap={{ scale: 0.93 }}
+          animate={{
+            boxShadow: [
+              '0 4px 14px rgba(255,215,0,0.18)',
+              '0 10px 28px rgba(255,215,0,0.44)',
+              '0 4px 14px rgba(255,215,0,0.18)',
+            ],
+            borderColor: [
+              'rgba(255,215,0,0.25)',
+              'rgba(255,215,0,0.85)',
+              'rgba(255,215,0,0.25)',
+            ],
+          }}
+          transition={{
+            boxShadow:   { repeat: Infinity, duration: 2.4, ease: 'easeInOut' },
+            borderColor: { repeat: Infinity, duration: 2.4, ease: 'easeInOut' },
+          }}
+          style={{
+            position: 'relative', overflow: 'hidden',
+            display: 'inline-flex', alignItems: 'center', gap: '8px',
+            background: 'linear-gradient(135deg, #3E2723 0%, #5C2317 50%, #8B1C1C 100%)',
+            color: '#FFD700',
+            borderRadius: '50px',
+            padding: '1rem 2rem',
+            fontSize: '1rem', fontWeight: 800,
+            fontFamily: 'var(--font-montserrat)',
+            border: '1.5px solid rgba(255,215,0,0.25)',
+            cursor: 'pointer', letterSpacing: '0.05em',
+            marginTop: '1rem',
+          }}
+        >
+          {/* Shimmer */}
+          <motion.span
+            style={{ position: 'absolute', top: 0, left: '-80%', width: '55%', height: '100%', background: 'linear-gradient(90deg, transparent, rgba(255,215,0,0.16), transparent)', transform: 'skewX(-20deg)', pointerEvents: 'none' }}
+            animate={{ left: ['-80%', '160%'] }}
+            transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut', repeatDelay: 2 }}
+          />
+          {/* Sparkles */}
+          <motion.span
+            animate={{ rotate: [0, 18, -18, 0], scale: [1, 1.3, 0.85, 1] }}
+            transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut', delay: 0.4 }}
+            style={{ display: 'flex' }}
+          >
+            <Sparkles size={18} />
+          </motion.span>
+          SUBSCRIBE
+        </motion.button>
       </div>
+
+      <NewsletterModal isOpen={isNewsletterOpen} onClose={() => setIsNewsletterOpen(false)} />
     </nav>
   );
 }

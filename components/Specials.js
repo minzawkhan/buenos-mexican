@@ -4,12 +4,12 @@ import { motion, useMotionValue, useTransform } from 'framer-motion';
 
 const specials = [
   { day: 'Monday', title: 'Restaurant Closed', desc: 'Resting up for the week ahead!', active: false },
-  { day: 'Tuesday', title: 'Margarita Madness', desc: 'Half-price on all house margaritas.', active: true },
-  { day: 'Wednesday', title: 'Nacho Night', desc: 'Loaded nachos for the table, 30% off.', active: true },
-  { day: 'Thursday', title: 'Taco Discount', desc: 'Buy 2 get 1 free on all street tacos.', active: true },
-  { day: 'Friday', title: 'Fajita Fiesta', desc: 'Sizzling fajitas with a complimentary side.', active: true },
-  { day: 'Saturday', title: 'Burrito Bash', desc: 'Our massive California burritos on special.', active: true },
-  { day: 'Sunday', title: 'Quesadilla Chill', desc: 'Relax with our signature stuffed quesadillas.', active: true },
+  { day: 'Tuesday', title: 'Taco Tuesday', desc: '10% off all taco plates & all margaritas.', active: true },
+  { day: 'Wednesday', title: 'Nacho & Beer Night', desc: '10% off nachos platter & all beers.', active: true },
+  { day: 'Thursday', title: 'Thirsty Thursday', desc: 'Buy 1 get 1 free on all margaritas.', active: true },
+  { day: 'Friday', title: 'Fajita Fiesta', desc: '10% off all fajita platters.', active: true },
+  { day: 'Saturday', title: 'Burrito Bash', desc: '10% off all burritos.', active: true },
+  { day: 'Sunday', title: 'Quesadilla Chill', desc: '10% off all quesadillas.', active: true },
 ];
 
 const SpecialCard = ({ special, index }) => {

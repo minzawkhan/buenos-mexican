@@ -1,194 +1,528 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import WheelPicker from './WheelPicker';
+import { User, Mail, Phone, CalendarDays, CheckCircle } from 'lucide-react';
 
 export default function Booking() {
-  const [formData, setFormData] = useState({ 
-    name: '', 
-    email: '', 
-    date: new Date().toISOString().split('T')[0], 
-    time: '18:00', 
-    partySize: '2' 
+  const todayBangkok = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    date: todayBangkok,
+    time: '18:00',
+    partySize: '2',
+    website: '' // Honeypot field
   });
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
   const [errorMsg, setErrorMsg] = useState('');
+  const [suggestedTimes, setSuggestedTimes] = useState([]);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileWidgetId = useRef(null);
 
-  // Generate Date Options (Next 30 days)
+  useEffect(() => {
+    const removePreviousWidget = () => {
+      if (turnstileWidgetId.current !== null && window.turnstile) {
+        try {
+          window.turnstile.remove(turnstileWidgetId.current);
+        } catch (e) {
+          console.warn('[Turnstile] Could not remove previous widget:', e.message);
+        }
+        turnstileWidgetId.current = null;
+      }
+    };
+
+    const renderWidget = () => {
+      if (!window.turnstile) return;
+      const container = document.getElementById('turnstile-container');
+      if (!container) return;
+
+      // Always clean up previous widget before rendering a new one
+      removePreviousWidget();
+      container.innerHTML = '';
+
+      try {
+        turnstileWidgetId.current = window.turnstile.render('#turnstile-container', {
+          sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '1x00000000000000000000AA',
+          callback: (token) => {
+            setTurnstileToken(token);
+          },
+          'expired-callback': () => {
+            setTurnstileToken('');
+          },
+          'error-callback': () => {
+            setTurnstileToken('');
+            console.warn('[Turnstile] Challenge error — will retry on next interaction.');
+          },
+        });
+      } catch (e) {
+        console.error('[Turnstile] Render error:', e);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      if (!document.getElementById('turnstile-script')) {
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.id = 'turnstile-script';
+        script.async = true;
+        script.defer = true;
+        script.onload = renderWidget;
+        document.body.appendChild(script);
+      } else if (window.turnstile) {
+        renderWidget();
+      } else {
+        const interval = setInterval(() => {
+          if (window.turnstile) {
+            renderWidget();
+            clearInterval(interval);
+          }
+        }, 100);
+        return () => clearInterval(interval);
+      }
+    }
+
+    return () => {
+      removePreviousWidget();
+    };
+  }, []);
+
+  // Generate Date Options (Next 30 days, anchored to Bangkok timezone)
   const dateOptions = useMemo(() => {
     const dates = [];
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+    const base = new Date(todayStr + 'T00:00:00');
     for (let i = 0; i < 30; i++) {
-      const d = new Date();
+      const d = new Date(base);
       d.setDate(d.getDate() + i);
       dates.push(d.toISOString().split('T')[0]);
     }
     return dates;
   }, []);
 
-  // Generate Time Options (12:00 PM to 1:00 AM next day)
+  // Generate Time Options (17:00 to 00:30)
   const timeOptions = useMemo(() => {
     const times = [];
-    // 12:00 to 23:30
-    for (let h = 12; h <= 23; h++) {
+    for (let h = 17; h <= 23; h++) {
       times.push(`${h}:00`);
       times.push(`${h}:30`);
     }
-    // 00:00 to 01:00
     times.push('00:00');
     times.push('00:30');
-    times.push('01:00');
     return times;
   }, []);
 
   const partyOptions = useMemo(() => ['1', '2', '3', '4', '5', '6', '7', '8', '9+'], []);
 
-  const handleSubmit = async (e) => {
+  const formattedConfirmDate = useMemo(() => {
+    if (!formData.date) return '';
+    try {
+      const d = new Date(formData.date + 'T00:00:00');
+      return d.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch (e) {
+      return formData.date;
+    }
+  }, [formData.date]);
+
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setStatus('loading');
-    setErrorMsg('');
-
-    // Use RPC for concurrency control and automatic table assignment
-    const { data, error } = await supabase.rpc('create_booking', {
-      p_name: formData.name,
-      p_email: formData.email,
-      p_date: formData.date,
-      p_time: formData.time,
-      p_party_size: formData.partySize,
-    });
-
-    if (error || (data && data.error)) {
-      console.error('Booking error:', error || data.error);
-      setErrorMsg(data?.error || 'Something went wrong. Please try again or call us directly.');
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+    if (formData.date < todayStr) {
+      setErrorMsg('Please select today or a future date.');
       setStatus('error');
       return;
     }
+    if (!turnstileToken) {
+      setErrorMsg('Please complete the security check.');
+      setStatus('error');
+      return;
+    }
+    setShowConfirmModal(true);
+  };
 
-    setStatus('success');
+  const handleConfirmBooking = async () => {
+    setShowConfirmModal(false);
+    setStatus('loading');
+    setErrorMsg('');
+
+    try {
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          date: formData.date,
+          time: formData.time,
+          partySize: formData.partySize,
+          website: formData.website,
+          turnstileToken: turnstileToken,
+        }),
+      });
+
+      if (res.status === 409) {
+        throw new Error('409_CONFLICT');
+      }
+
+      if (res.status !== 200 && res.status !== 201) {
+        let errMsg = 'Something went wrong.';
+        let isSlotFull = false;
+        let suggested = [];
+        let result = {};
+        try {
+          result = await res.json();
+          errMsg = result.message || result.error || errMsg;
+          isSlotFull = result.error === 'TIME_SLOT_FULL' || errMsg.includes('No tables available');
+          suggested = result.suggested_times || [];
+        } catch (e) {
+          // ignore parsing error
+        }
+
+        if (isSlotFull) {
+          console.warn('Booking info: Selected slot is full.');
+          setErrorMsg(errMsg || 'We apologize, but all tables are fully booked for this slot. We truly appreciate your understanding and respect your interest in dining with us!');
+          setSuggestedTimes(suggested);
+        } else {
+          console.error('Booking unexpected error:', errMsg);
+          setErrorMsg(errMsg || 'Something went wrong. Please try again or call us directly.');
+          setSuggestedTimes([]);
+        }
+        setStatus('error');
+        if (window.turnstile) {
+          window.turnstile.reset();
+        }
+        return;
+      }
+
+      const result = await res.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      setSuggestedTimes([]);
+      setStatus('success');
+      // Reset Turnstile for potential future bookings
+      setTurnstileToken('');
+      if (window.turnstile) {
+        try { window.turnstile.reset(); } catch (e) { /* ignore */ }
+      }
+    } catch (err) {
+      console.error('Booking unexpected error:', err);
+      if (err.message === '409_CONFLICT') {
+        setErrorMsg('This slot was just taken by another customer. Please select a different time.');
+      } else {
+        setErrorMsg('An unexpected error occurred. Please try again or call us directly.');
+      }
+      setSuggestedTimes([]);
+      setStatus('error');
+      if (window.turnstile) {
+        window.turnstile.reset();
+      }
+    }
   };
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
+  const inputBase = {
+    width: '100%',
+    background: 'var(--background)',
+    border: '1.5px solid var(--border)',
+    borderRadius: '12px',
+    padding: '13px 16px 13px 44px',
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    color: 'var(--foreground)',
+    fontFamily: 'var(--font-montserrat)',
+    outline: 'none',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+  };
+
+  const iconStyle = {
+    position: 'absolute',
+    left: '14px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'rgba(139,28,28,0.45)',
+    pointerEvents: 'none',
+  };
+
+  const sectionLabel = (text) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.1rem' }}>
+      <span style={{ display: 'inline-block', width: '18px', height: '1.5px', background: '#8B1C1C', flexShrink: 0 }} />
+      <span style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#8B1C1C', whiteSpace: 'nowrap' }}>{text}</span>
+      <span style={{ display: 'block', flex: 1, height: '1px', background: 'rgba(139,28,28,0.15)' }} />
+    </div>
+  );
+
   return (
+    <>
     <section id="booking" className="py-24 relative perspective-container">
-      <div className="container" style={{ maxWidth: '896px' }}>
-        
-        <motion.div 
+      <div className="container" style={{ maxWidth: '860px' }}>
+
+        <motion.div
           initial={{ opacity: 0, y: 60 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className="booking-box"
-          style={{ overflow: 'visible' }}
+          viewport={{ once: true, margin: '-50px' }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+          style={{
+            background: 'var(--surface)',
+            border: '2px dashed var(--border)',
+            borderRadius: '24px',
+            padding: 'clamp(2rem, 5vw, 3.5rem)',
+            boxShadow: '0 25px 50px -12px rgba(62,39,35,0.2)',
+            overflow: 'visible',
+          }}
         >
-
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
+          {/* ── Header ── */}
+          <motion.div
+            initial={{ opacity: 0, y: -16 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-center"
-            style={{ marginBottom: '2.5rem' }}
+            style={{ textAlign: 'center', marginBottom: '2.5rem' }}
           >
-            <h2 className="script-font" style={{ fontSize: 'clamp(3rem, 5vw, 4.5rem)', marginBottom: '1rem' }}>Reserve A Table</h2>
-            <p className="text-gray">Join us for an unforgettable dining experience.</p>
+            <div style={{ width: 56, height: 56, background: 'rgba(139,28,28,0.08)', border: '1.5px solid rgba(139,28,28,0.18)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', color: '#8B1C1C' }}>
+              <CalendarDays size={26} />
+            </div>
+            <h2 className="script-font" style={{ fontSize: 'clamp(2.4rem, 5vw, 3.8rem)', color: 'var(--foreground)', marginBottom: '0.5rem' }}>
+              Reserve A Table
+            </h2>
+            <p style={{ color: 'var(--text-muted, #888)', fontSize: '0.95rem', fontWeight: 500, fontFamily: 'var(--font-montserrat)' }}>
+              Join us for an unforgettable dining experience.
+            </p>
           </motion.div>
 
           {status === 'success' ? (
-            <motion.div 
-              initial={{ rotateY: 90, opacity: 0 }}
-              animate={{ rotateY: 0, opacity: 1 }}
-              transition={{ type: "spring", bounce: 0.5 }}
-              className="text-center"
-              style={{ padding: '2.5rem 0' }}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', bounce: 0.4 }}
+              style={{ textAlign: 'center', padding: '2.5rem 0' }}
             >
-              <div style={{ width: '80px', height: '80px', backgroundColor: 'var(--secondary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
-                <svg style={{ width: '40px', height: '40px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+              <div style={{ width: 80, height: 80, background: 'rgba(51,105,30,0.1)', border: '1.5px solid rgba(51,105,30,0.3)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: '#33691E' }}>
+                <CheckCircle size={38} />
               </div>
-              <h3 className="text-foreground" style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Booking Confirmed!</h3>
-              <p className="text-gray">We look forward to hosting you.</p>
-              <button onClick={() => setStatus('idle')} className="text-primary" style={{ marginTop: '2rem', textDecoration: 'underline' }}>Make another booking</button>
+              <h3 style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--foreground)', marginBottom: '0.5rem', fontFamily: 'var(--font-montserrat)' }}>Booking Confirmed!</h3>
+              <p style={{ color: 'var(--text-muted, #888)', fontFamily: 'var(--font-montserrat)' }}>We look forward to hosting you.</p>
+              <button onClick={() => setStatus('idle')} style={{ marginTop: '2rem', color: 'var(--primary)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-montserrat)', fontWeight: 600 }}>
+                Make another booking
+              </button>
             </motion.div>
           ) : (
             <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ marginBottom: '2rem' }}>
-                <div className="relative">
-                  <label className="input-label">Full Name</label>
-                  <input required type="text" name="name" value={formData.name} onChange={handleChange} className="input-field" placeholder="John Doe" />
-                </div>
-                <div className="relative">
-                  <label className="input-label">Email Address</label>
-                  <input required type="email" name="email" value={formData.email} onChange={handleChange} className="input-field" placeholder="john@example.com" />
+              {/* Honeypot */}
+              <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, width: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
+                <input type="text" name="website" value={formData.website || ''} onChange={handleChange} tabIndex="-1" autoComplete="off" />
+              </div>
+
+              {/* ── Personal Details ── */}
+              <div style={{ marginBottom: '2rem' }}>
+                {sectionLabel('Personal Details')}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div style={{ position: 'relative' }}>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--foreground)', marginBottom: '6px', fontFamily: 'var(--font-montserrat)', letterSpacing: '0.04em' }}>Full Name</label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={iconStyle}><User size={16} /></span>
+                      <input required type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Your full name"
+                        style={inputBase}
+                        onFocus={e => { e.target.style.borderColor = 'var(--primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(139,28,28,0.1)'; }}
+                        onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ position: 'relative' }}>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--foreground)', marginBottom: '6px', fontFamily: 'var(--font-montserrat)', letterSpacing: '0.04em' }}>Email Address</label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={iconStyle}><Mail size={16} /></span>
+                      <input required type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Your email address"
+                        style={inputBase}
+                        onFocus={e => { e.target.style.borderColor = 'var(--primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(139,28,28,0.1)'; }}
+                        onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ position: 'relative' }} className="md:col-span-2">
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--foreground)', marginBottom: '6px', fontFamily: 'var(--font-montserrat)', letterSpacing: '0.04em' }}>Phone Number</label>
+                    <div style={{ position: 'relative' }}>
+                      <span style={iconStyle}><Phone size={16} /></span>
+                      <input required type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="Your phone number"
+                        style={inputBase}
+                        onFocus={e => { e.target.style.borderColor = 'var(--primary)'; e.target.style.boxShadow = '0 0 0 3px rgba(139,28,28,0.1)'; }}
+                        onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* iOS Style Wheel Pickers */}
-              <div className="wheel-pickers-wrapper" style={{ 
-                display: 'flex', 
-                flexWrap: 'wrap',
-                gap: '1rem', 
-                background: 'rgba(0,0,0,0.2)', 
-                padding: '1.5rem', 
-                borderRadius: '16px',
-                border: '1px solid rgba(255,255,255,0.05)',
-                marginBottom: '2rem'
-              }}>
-                <WheelPicker 
-                  label="Select Date" 
-                  options={dateOptions} 
-                  value={formData.date} 
-                  onChange={(val) => setFormData(prev => ({ ...prev, date: val }))} 
-                />
-                <WheelPicker 
-                  label="Time" 
-                  options={timeOptions} 
-                  value={formData.time} 
-                  onChange={(val) => setFormData(prev => ({ ...prev, time: val }))} 
-                />
-                <WheelPicker 
-                  label="Party" 
-                  options={partyOptions} 
-                  value={formData.partySize} 
-                  onChange={(val) => setFormData(prev => ({ ...prev, partySize: val }))} 
-                />
+              {/* ── Reservation Details ── */}
+              <div style={{ marginBottom: '2rem' }}>
+                {sectionLabel('Reservation Details')}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', background: 'var(--background)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                  <WheelPicker label="Select Date" options={dateOptions} value={formData.date} onChange={(val) => setFormData(prev => ({ ...prev, date: val }))} />
+                  <WheelPicker label="Time"        options={timeOptions}  value={formData.time} onChange={(val) => setFormData(prev => ({ ...prev, time: val }))} />
+                  <WheelPicker label="Party"       options={partyOptions} value={formData.partySize} onChange={(val) => setFormData(prev => ({ ...prev, partySize: val }))} />
+                </div>
               </div>
 
-              {/* Error Message */}
+              {/* ── Error ── */}
               {status === 'error' && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  style={{ marginBottom: '1.5rem', padding: '12px 16px', backgroundColor: '#FFF0F0', border: '1px solid #e53935', borderRadius: '8px', color: '#C62828', fontSize: '0.9rem', fontWeight: '600' }}
-                >
-                  ⚠️ {errorMsg}
+                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ padding: '12px 16px', background: '#FFF0F0', border: '1px solid #E53935', borderRadius: '10px', color: '#C62828', fontSize: '0.875rem', fontWeight: 600, fontFamily: 'var(--font-montserrat)' }}>
+                    ⚠️ {errorMsg}
+                  </div>
+                  {suggestedTimes.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
+                      <p style={{ width: '100%', fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)', fontFamily: 'var(--font-montserrat)' }}>Suggested alternative times:</p>
+                      {suggestedTimes.map((time) => (
+                        <button key={time} type="button"
+                          onClick={() => { setFormData(prev => ({ ...prev, time })); setStatus('idle'); setErrorMsg(''); setSuggestedTimes([]); }}
+                          style={{ background: 'rgba(139,28,28,0.08)', color: '#8B1C1C', border: '1px solid rgba(139,28,28,0.25)', borderRadius: '50px', padding: '0.4rem 1rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-montserrat)' }}
+                        >{time}</button>
+                      ))}
+                    </div>
+                  )}
                 </motion.div>
               )}
 
-              <motion.button 
+              {/* ── CAPTCHA ── */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+                <div id="turnstile-container" />
+              </div>
+
+              {/* ── Submit ── */}
+              <motion.button
                 suppressHydrationWarning
-                whileHover={{ scale: 1.02 }}
+                whileHover={{ scale: 1.02, boxShadow: '0 12px 35px rgba(139,28,28,0.6)' }}
                 whileTap={{ scale: 0.98 }}
-                type="submit" 
-                disabled={status === 'loading'} 
-                className="primary-btn" 
-                style={{ width: '100%', opacity: status === 'loading' ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                type="submit"
+                disabled={status === 'loading'}
+                style={{
+                  width: '100%',
+                  padding: '16px 24px',
+                  background: 'linear-gradient(135deg, #8B1C1C 0%, #5C1111 100%)',
+                  color: '#FDF8F0',
+                  border: '1px solid rgba(255,215,0,0.2)',
+                  borderRadius: '12px',
+                  fontSize: '0.9rem',
+                  fontWeight: 800,
+                  fontFamily: 'var(--font-montserrat)',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  cursor: status === 'loading' ? 'wait' : 'pointer',
+                  opacity: status === 'loading' ? 0.7 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  boxShadow: '0 6px 24px rgba(139,28,28,0.4)',
+                }}
               >
                 {status === 'loading' && (
-                  <svg style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite' }} viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3" />
+                  <svg style={{ width: 20, height: 20, animation: 'spin 1s linear infinite' }} viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.25)" strokeWidth="3" />
                     <path d="M12 2a10 10 0 0 1 10 10" stroke="white" strokeWidth="3" strokeLinecap="round" />
                     <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                   </svg>
                 )}
-                <span>
-                   {status === 'loading' ? 'Sending your booking...' : 'Confirm Reservation'}
-                </span>
+                {status === 'loading' ? 'Sending your booking…' : 'Confirm Reservation'}
               </motion.button>
             </form>
           )}
-
         </motion.div>
       </div>
+
     </section>
+
+    <AnimatePresence>
+      {showConfirmModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setShowConfirmModal(false)}
+          style={{
+            position: 'fixed',
+              inset: 0,
+              zIndex: 10000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px',
+              background: 'rgba(20, 12, 8, 0.65)',
+              backdropFilter: 'blur(6px)',
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                padding: '2.5rem',
+                width: '100%',
+                maxWidth: '440px',
+                background: 'var(--surface)',
+                border: '2px dashed var(--border)',
+                borderRadius: '24px',
+                boxShadow: '0 30px 60px rgba(62,39,35,0.25)',
+              }}
+            >
+              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                <h3 className="script-font" style={{ fontSize: '2.4rem', color: 'var(--foreground)', marginBottom: '0.3rem' }}>Confirm Booking</h3>
+                <p style={{ color: 'var(--text-muted, #888)', fontSize: '0.875rem', fontFamily: 'var(--font-montserrat)', fontWeight: 500 }}>
+                  Please review your reservation details
+                </p>
+              </div>
+
+              <div style={{ background: 'var(--background)', padding: '1.25rem', borderRadius: '14px', border: '1px solid var(--border)', marginBottom: '2rem' }}>
+                {[
+                  { label: 'Date', value: formattedConfirmDate },
+                  { label: 'Time', value: formData.time },
+                  { label: 'Party Size', value: `${formData.partySize} guests` },
+                ].map((row, i, arr) => (
+                  <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem', paddingBottom: i < arr.length - 1 ? '0.75rem' : 0, marginBottom: i < arr.length - 1 ? '0.75rem' : 0, borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <span style={{ color: '#888', fontFamily: 'var(--font-montserrat)', fontWeight: 500 }}>{row.label}</span>
+                    <span style={{ color: 'var(--foreground)', fontFamily: 'var(--font-montserrat)', fontWeight: 700 }}>{row.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.875rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmModal(false)}
+                  style={{ flex: 1, padding: '13px 16px', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'var(--font-montserrat)', letterSpacing: '0.05em', background: 'var(--background)', color: 'var(--foreground)', border: '1.5px solid var(--border)', borderRadius: '10px', cursor: 'pointer' }}
+                >
+                  Cancel / Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBooking}
+                  style={{ flex: 1, padding: '13px 16px', fontSize: '0.85rem', fontWeight: 800, fontFamily: 'var(--font-montserrat)', letterSpacing: '0.06em', textTransform: 'uppercase', background: 'linear-gradient(135deg, #8B1C1C 0%, #5C1111 100%)', color: '#FDF8F0', border: 'none', borderRadius: '10px', cursor: 'pointer', boxShadow: '0 4px 18px rgba(139,28,28,0.35)' }}
+                >
+                  Confirm Booking
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+    </AnimatePresence>
+    </>
   );
 }

@@ -16,12 +16,16 @@
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-quill": "^2.0.0",
+    "react-quill-new": "^3.8.3",
+    "resend": "^6.12.4",
     "swiper": "^12.1.4"
   },
   "devDependencies": {
-    "@types/node": "25.8.0",
-    "@types/react": "19.2.14",
+    "@types/node": "^25.8.0",
+    "@types/react": "^19.2.14",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6"
+    "eslint-config-next": "16.2.6",
+    "typescript": "^6.0.3"
   }
 }

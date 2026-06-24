@@ -4,13 +4,13 @@ import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import Image from 'next/image';
 
 const salsas = [
-  { name: "Pico De Gallo", level: 1, desc: "Fresh and chunky, this raw salsa mixes tomatoes, onions, cilantro, lime, and jalapeños for a zesty, crisp bite that brightens any dish.", color: "#4CAF50", image: "/images/pico.webp" },
-  { name: "Salsa Verde", level: 1, desc: "Made with green tomatoes, green chilies, and fresh herbs, this tangy green salsa delivers a sharp, citrusy punch with just the right heat.", color: "#8BC34A", image: "/images/verde.webp" },
-  { name: "Mango Salsa", level: 1, desc: "A tropical twist combining juicy mangoes, red onion, lime, and chili—sweet, spicy, and vibrant, perfect with grilled meats or seafood.", color: "#FFC107", image: "/images/mango.webp" },
-  { name: "Pineapple Salsa", level: 1, desc: "Sweet meets heat in this sunny salsa made with fresh pineapple, jalapeños, red onions, and cilantro—bright, bold, and refreshing.", color: "#FFEB3B", image: "/images/pineapple.webp" },
-  { name: "Salsa Roja", level: 2, desc: "A classic red salsa featuring roasted tomatoes, chilies, garlic, and onions—smooth, savory, and deeply flavorful with a kick.", color: "#FF9800", image: "/images/roja.webp" },
-  { name: "Charred Tomato Salsa", level: 3, desc: "Smoky and rich, this salsa is made with flame-roasted tomatoes, garlic, and jalapeño peppers, delivering a deep, earthy heat.", color: "#F44336", image: "/images/roja.webp" },
-  { name: "Buenos Hotcha", level: 4, desc: "A fiery red hot sauce bursting with bold chili flavor and a tangy finish—Buenos Hotcha brings the heat.", color: "#B71C1C", image: "/images/roja.webp" },
+  { name: "Pico De Gallo", level: 1, desc: "Fresh and chunky, this raw salsa mixes tomatoes, onions, cilantro, lime, and jalapeños for a zesty, crisp bite that brightens any dish.", color: "#4CAF50", image: "/images/pico_final.webp" },
+  { name: "Salsa Verde", level: 1, desc: "Made with green tomatoes, green chilies, and fresh herbs, this tangy green salsa delivers a sharp, citrusy punch with just the right heat.", color: "#8BC34A", image: "/images/verde_final.webp" },
+  { name: "Mango Salsa", level: 1, desc: "A tropical twist combining juicy mangoes, red onion, lime, and chili—sweet, spicy, and vibrant, perfect with grilled meats or seafood.", color: "#FFC107", image: "/images/mango_final.webp" },
+  { name: "Pineapple Salsa", level: 1, desc: "Sweet meets heat in this sunny salsa made with fresh pineapple, jalapeños, red onions, and cilantro—bright, bold, and refreshing.", color: "#FFEB3B", image: "/images/pineapple_final.webp" },
+  { name: "Salsa Roja", level: 2, desc: "A classic red salsa featuring roasted tomatoes, chilies, garlic, and onions—smooth, savory, and deeply flavorful with a kick.", color: "#FF9800", image: "/images/roja_centered.webp" },
+  { name: "Charred Tomato Salsa", level: 3, desc: "Smoky and rich, this salsa is made with flame-roasted tomatoes, garlic, and jalapeño peppers, delivering a deep, earthy heat.", color: "#F44336", image: "/images/charred_tomato_centered.webp" },
+  { name: "Buenos Hotcha", level: 4, desc: "A fiery red hot sauce bursting with bold chili flavor and a tangy finish—Buenos Hotcha brings the heat.", color: "#B71C1C", image: "/images/hotcha_centered_v2.webp" },
 ];
 
 const SalsaCard = ({ salsa, index }) => {
@@ -34,20 +34,25 @@ const SalsaCard = ({ salsa, index }) => {
     y.set(0.5);
   }
 
+  function handleTouchStart() {
+    x.set(0.5);
+    y.set(0.5);
+  }
+
   return (
     <motion.div 
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
+      onTouchStart={handleTouchStart}
       initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px" }}
       transition={{ delay: 0.2 + ((index % 5) * 0.15), duration: 0.6, ease: "easeOut" }}
       className="flex flex-col md:flex-row gap-6 items-center salsa-card"
-      style={{ 
+      style={{
         rotateX: springX,
         rotateY: springY,
         transformStyle: 'preserve-3d',
-        perspective: 1000,
         backgroundColor: 'var(--background)', 
         padding: '1.5rem', 
         borderRadius: '16px', 
@@ -76,14 +81,15 @@ const SalsaCard = ({ salsa, index }) => {
       <div style={{ flex: 1, transform: 'translateZ(20px)', zIndex: 10 }}>
         <div className="flex items-center gap-4 flex-wrap" style={{ marginBottom: '0.75rem' }}>
           <h3 className="text-foreground" style={{ fontSize: '1.5rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1.5px' }}>{salsa.name}</h3>
-          <div style={{ 
-            backgroundColor: salsa.level === 1 ? '#33691E' : salsa.level === 2 ? '#FF9800' : '#8B1C1C', 
-            color: 'white', 
-            padding: '4px 16px', 
-            borderRadius: '20px', 
-            fontWeight: 'bold', 
-            fontSize: '0.875rem', 
-            transform: 'translateZ(10px)' 
+          <div style={{
+            backgroundColor: salsa.level === 1 ? '#33691E' : salsa.level === 2 ? '#FF9800' : salsa.level === 3 ? '#8B1C1C' : '#4A0000',
+            color: 'white',
+            padding: '4px 16px',
+            borderRadius: '20px',
+            fontWeight: 'bold',
+            fontSize: '0.875rem',
+            transform: 'translateZ(10px)',
+            boxShadow: salsa.level === 4 ? '0 0 10px rgba(180,0,0,0.6)' : 'none'
           }}>
             🌶️ Spice Level {salsa.level}
           </div>
@@ -109,9 +115,9 @@ export default function Salsas() {
           <p className="text-gray text-xl" style={{ fontStyle: 'italic' }}>(Ranked in order of spiciness)</p>
         </div>
 
-        <div className="flex flex-col gap-6" style={{ perspective: 1200 }}>
+        <div className="flex flex-col gap-6" style={{ perspective: '1200px' }}>
           {salsas.map((salsa, index) => (
-            <SalsaCard key={index} salsa={salsa} index={index} />
+            <SalsaCard key={salsa.name} salsa={salsa} index={index} />
           ))}
         </div>
       </motion.div>

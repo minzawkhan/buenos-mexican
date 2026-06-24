@@ -18,17 +18,37 @@ export default function WheelPicker({ options, value, onChange, label }) {
 
   const timeoutRef = useRef(null);
 
-  // Sync internal index with prop value
+  const prevValueRef = useRef(value);
+
+  // Sync internal index with prop value when it changes from the outside
   useEffect(() => {
-    const index = options.indexOf(value);
-    if (index !== -1 && index !== activeIndex) {
-      setActiveIndex(index);
-      // Ensure the scroll position matches the new value
-      if (containerRef.current) {
-        containerRef.current.scrollTop = index * ITEM_HEIGHT;
+    if (value !== prevValueRef.current) {
+      prevValueRef.current = value;
+      const index = options.indexOf(value);
+      if (index !== -1) {
+        setActiveIndex(index);
+        // Ensure the scroll position matches the new value
+        if (containerRef.current) {
+          containerRef.current.scrollTop = index * ITEM_HEIGHT;
+        }
       }
     }
   }, [value, options]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const activeIndexRef = useRef(activeIndex);
+  useEffect(() => {
+    activeIndexRef.current = activeIndex;
+  }, [activeIndex]);
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  const optionsRef = useRef(options);
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -37,14 +57,15 @@ export default function WheelPicker({ options, value, onChange, label }) {
     const handleScroll = () => {
       const offset = container.scrollTop;
       const index = Math.round(offset / ITEM_HEIGHT);
+      const currentOptions = optionsRef.current;
       
-      if (index >= 0 && index < options.length && index !== activeIndex) {
+      if (index >= 0 && index < currentOptions.length && index !== activeIndexRef.current) {
         setActiveIndex(index);
         
         // Debounce the onChange to prevent excessive re-renders in parent
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         timeoutRef.current = setTimeout(() => {
-          onChange(options[index]);
+          onChangeRef.current(currentOptions[index]);
         }, 150);
       }
     };
@@ -54,7 +75,7 @@ export default function WheelPicker({ options, value, onChange, label }) {
       container.removeEventListener('scroll', handleScroll);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [options, activeIndex, onChange]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="wheel-picker-container">

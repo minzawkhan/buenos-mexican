@@ -26,7 +26,12 @@ export default function ParticleTrail() {
     let particles = [];
     const colors = ['#8B1C1C', '#D2691E', '#E6B325', '#795548'];
 
+    let lastMouseTime = 0;
     const handleMouseMove = (e) => {
+      const now = performance.now();
+      if (now - lastMouseTime < 16) return;
+      lastMouseTime = now;
+      
       // Spawn 2 particles per mouse move event
       for(let i=0; i<2; i++) {
         particles.push({

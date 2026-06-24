@@ -29,7 +29,7 @@ export default function Location() {
           </motion.h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
           {/* Map Embed */}
           <motion.div 
             initial={{ opacity: 0, y: 40 }}

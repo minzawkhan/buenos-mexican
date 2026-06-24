@@ -1,6 +1,25 @@
 import './globals.css';
 import DynamicBackground from '@/components/DynamicBackground';
+import ClientEffects from '@/components/ClientEffects';
+import { Alfa_Slab_One, Bree_Serif, Montserrat } from 'next/font/google';
 
+const alfaSlabOne = Alfa_Slab_One({ 
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-alfa'
+});
+
+const breeSerif = Bree_Serif({ 
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-bree'
+});
+
+const montserrat = Montserrat({ 
+  weight: ['400', '500', '600', '700'],
+  subsets: ['latin'],
+  variable: '--font-montserrat'
+});
 
 
 export const metadata = {
@@ -45,12 +64,13 @@ export default function RootLayout({ children }) {
   };
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${alfaSlabOne.variable} ${breeSerif.variable} ${montserrat.variable}`}>
       <body>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+        <ClientEffects />
         <DynamicBackground />
         {children}
       </body>

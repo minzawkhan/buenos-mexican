@@ -12,10 +12,10 @@ echo   Buenos Mexican Cuisine — Supabase Deploy
 echo ========================================================
 echo.
 
-REM ---- EDIT THESE TWO VALUES ----
-set SUPABASE_ACCESS_TOKEN=sb_publishable_bWTs6QxY6USRl6605EBDLQ_41Zan2i-
+REM ---- SET THESE VALUES (or export as environment variables) ----
+if "%SUPABASE_ACCESS_TOKEN%"=="" set SUPABASE_ACCESS_TOKEN=YOUR_SUPABASE_ACCESS_TOKEN_HERE
 set RESEND_API_KEY=YOUR_RESEND_API_KEY_HERE
-REM --------------------------------
+REM ---------------------------------------------------------------
 
 echo [1/3] Linking to Supabase project...
 set SUPABASE_ACCESS_TOKEN=%SUPABASE_ACCESS_TOKEN%
