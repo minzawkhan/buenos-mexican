@@ -562,21 +562,10 @@ button {
   font-size: 3.5rem;
 }
 
-/* Linear Transition for Quick Menu */
-.quick-menu-swiper .swiper-wrapper {
+/* Linear Transition for Quick Menu + Salsas marquee */
+.quick-menu-swiper .swiper-wrapper,
+.salsa-swiper .swiper-wrapper {
   transition-timing-function: linear !important;
-}
-
-/* Responsive Salsas Card Layout Tweaks */
-@media (max-width: 767px) {
-  .salsa-card {
-    margin-top: 45px !important;
-    padding-top: 3.5rem !important;
-  }
-  .salsa-image-container {
-    margin-top: -5.5rem !important;
-    margin-bottom: 0.5rem !important;
-  }
 }
 
 /* Menu Card Styles */
@@ -1026,12 +1015,6 @@ button {
   flex-wrap: wrap;
 }
 
-@media (min-width: 768px) {
-  .md-flex-row {
-    flex-direction: row;
-  }
-}
-
 /* ─── Menu Full Page — Section Cards ─── */
 
 .menu-section-card {
@@ -1083,13 +1066,6 @@ button {
   .special-section-card {
     padding: 1.5rem;
   }
-}
-
-.special-shimmer {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(105deg, transparent 40%, rgba(255, 215, 0, 0.06) 60%, transparent 80%);
-  pointer-events: none;
 }
 
 .special-section-header {

@@ -124,7 +124,6 @@ export default function NewsletterAdmin({ isSystemOnline = true }) {
           filter: `id=eq.${selectedCampaign.id}`,
         },
         (payload) => {
-          console.log('Realtime campaign update:', payload.new);
           setSelectedCampaign(payload.new);
           // Sync list
           setCampaigns((prev) =>
@@ -146,7 +145,6 @@ export default function NewsletterAdmin({ isSystemOnline = true }) {
           filter: `blast_id=eq.${selectedCampaign.id}`,
         },
         () => {
-          console.log('Realtime logs update. Refetching log details...');
           fetchLogs(selectedCampaign.id);
           // Also refetch campaign stats to keep counters synced
           fetchCampaigns().then((fresh) => {

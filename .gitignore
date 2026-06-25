@@ -48,3 +48,6 @@ test-*.js
 
 # project docs (non-code)
 Details projects/
+
+# original image backups (large files, not for deployment)
+_image_originals/

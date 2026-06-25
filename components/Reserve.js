@@ -7,21 +7,43 @@ import WheelPicker from './WheelPicker';
 import { User, Mail, Phone, CalendarDays, CheckCircle } from 'lucide-react';
 
 export default function Booking() {
-  const todayBangkok = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+  const getBangkokDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+
+  const getBangkokNowMinutes = () => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Bangkok', hour: 'numeric', minute: 'numeric', hour12: false,
+    }).formatToParts(new Date());
+    const h = parseInt(parts.find(p => p.type === 'hour')?.value ?? '0');
+    const m = parseInt(parts.find(p => p.type === 'minute')?.value ?? '0');
+    return (h === 24 ? 0 : h) * 60 + m;
+  };
+
+  const getSmartDefault = () => {
+    const todayStr = getBangkokDate();
+    const nowMinutes = getBangkokNowMinutes();
+    // Last slot is 00:30 = 1470 min. If nothing is 60+ min away, use tomorrow.
+    const hasSlots = 1470 > nowMinutes + 60;
+    if (hasSlots) return { date: todayStr, time: '18:00' };
+    const base = new Date(todayStr + 'T00:00:00');
+    base.setDate(base.getDate() + 1);
+    return { date: base.toISOString().split('T')[0], time: '18:00' };
+  };
+
+  const smartDefault = getSmartDefault();
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
-    date: todayBangkok,
-    time: '18:00',
+    date: smartDefault.date,
+    time: smartDefault.time,
     partySize: '2',
     website: '' // Honeypot field
   });
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
   const [errorMsg, setErrorMsg] = useState('');
-  const [suggestedTimes, setSuggestedTimes] = useState([]);
+  const [suggestedSlots, setSuggestedSlots] = useState([]);
   const [turnstileToken, setTurnstileToken] = useState('');
   const turnstileWidgetId = useRef(null);
 
@@ -92,15 +114,17 @@ export default function Booking() {
     };
   }, []);
 
-  // Generate Date Options (Next 30 days, anchored to Bangkok timezone)
+  // Generate Date Options (Next 30 days, anchored to Bangkok timezone — Mondays excluded, closed day)
   const dateOptions = useMemo(() => {
     const dates = [];
-    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+    const todayStr = getBangkokDate();
     const base = new Date(todayStr + 'T00:00:00');
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 37; i++) { // extra days to fill 30 after skipping Mondays
       const d = new Date(base);
       d.setDate(d.getDate() + i);
+      if (d.getDay() === 1) continue; // 1 = Monday
       dates.push(d.toISOString().split('T')[0]);
+      if (dates.length === 30) break;
     }
     return dates;
   }, []);
@@ -116,6 +140,31 @@ export default function Booking() {
     times.push('00:30');
     return times;
   }, []);
+
+  // Filter out past times when today is selected (Bangkok timezone, 1-hour buffer)
+  const availableTimeOptions = useMemo(() => {
+    const todayStr = getBangkokDate();
+    if (formData.date !== todayStr) return timeOptions;
+
+    const nowMinutes = getBangkokNowMinutes();
+    return timeOptions.filter(t => {
+      const [th, tm] = t.split(':').map(Number);
+      const slotMinutes = (th === 0 ? 24 : th) * 60 + tm;
+      return slotMinutes > nowMinutes + 60;
+    });
+  }, [formData.date, timeOptions]);
+
+  // If today has no slots left, auto-advance to tomorrow
+  useEffect(() => {
+    const todayStr = getBangkokDate();
+    if (formData.date === todayStr && availableTimeOptions.length === 0) {
+      const base = new Date(todayStr + 'T00:00:00');
+      base.setDate(base.getDate() + 1);
+      setFormData(prev => ({ ...prev, date: base.toISOString().split('T')[0], time: '18:00' }));
+    } else if (availableTimeOptions.length > 0 && !availableTimeOptions.includes(formData.time)) {
+      setFormData(prev => ({ ...prev, time: availableTimeOptions[0] }));
+    }
+  }, [availableTimeOptions]);
 
   const partyOptions = useMemo(() => ['1', '2', '3', '4', '5', '6', '7', '8', '9+'], []);
 
@@ -136,7 +185,7 @@ export default function Booking() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+    const todayStr = getBangkokDate();
     if (formData.date < todayStr) {
       setErrorMsg('Please select today or a future date.');
       setStatus('error');
@@ -186,19 +235,23 @@ export default function Booking() {
           result = await res.json();
           errMsg = result.message || result.error || errMsg;
           isSlotFull = result.error === 'TIME_SLOT_FULL' || errMsg.includes('No tables available');
-          suggested = result.suggested_times || [];
+          const rawSlots = result.suggested_slots || [];
+          const rawTimes = (result.suggested_times || []).map(t => ({ date: formData.date, time: t }));
+          const allSlots = rawSlots.length > 0 ? rawSlots : rawTimes;
+          // Filter out Mondays (closed day) from suggestions
+          suggested = allSlots.filter(s => new Date(s.date + 'T00:00:00').getDay() !== 1);
         } catch (e) {
           // ignore parsing error
         }
 
         if (isSlotFull) {
           console.warn('Booking info: Selected slot is full.');
-          setErrorMsg(errMsg || 'We apologize, but all tables are fully booked for this slot. We truly appreciate your understanding and respect your interest in dining with us!');
-          setSuggestedTimes(suggested);
+          setErrorMsg(errMsg || 'Ay caramba! This slot is fully packed — our tacos must be too good. Pick another time below!');
+          setSuggestedSlots(suggested);
         } else {
           console.error('Booking unexpected error:', errMsg);
           setErrorMsg(errMsg || 'Something went wrong. Please try again or call us directly.');
-          setSuggestedTimes([]);
+          setSuggestedSlots([]);
         }
         setStatus('error');
         if (window.turnstile) {
@@ -212,7 +265,7 @@ export default function Booking() {
         throw new Error(result.error);
       }
 
-      setSuggestedTimes([]);
+      setSuggestedSlots([]);
       setStatus('success');
       // Reset Turnstile for potential future bookings
       setTurnstileToken('');
@@ -226,7 +279,7 @@ export default function Booking() {
       } else {
         setErrorMsg('An unexpected error occurred. Please try again or call us directly.');
       }
-      setSuggestedTimes([]);
+      setSuggestedSlots([]);
       setStatus('error');
       if (window.turnstile) {
         window.turnstile.reset();
@@ -374,7 +427,7 @@ export default function Booking() {
                 {sectionLabel('Reservation Details')}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', background: 'var(--background)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border)' }}>
                   <WheelPicker label="Select Date" options={dateOptions} value={formData.date} onChange={(val) => setFormData(prev => ({ ...prev, date: val }))} />
-                  <WheelPicker label="Time"        options={timeOptions}  value={formData.time} onChange={(val) => setFormData(prev => ({ ...prev, time: val }))} />
+                  <WheelPicker key={`time-${availableTimeOptions.length}-${formData.date}`} label="Time" options={availableTimeOptions} value={formData.time} onChange={(val) => setFormData(prev => ({ ...prev, time: val }))} />
                   <WheelPicker label="Party"       options={partyOptions} value={formData.partySize} onChange={(val) => setFormData(prev => ({ ...prev, partySize: val }))} />
                 </div>
               </div>
@@ -385,15 +438,21 @@ export default function Booking() {
                   <div style={{ padding: '12px 16px', background: '#FFF0F0', border: '1px solid #E53935', borderRadius: '10px', color: '#C62828', fontSize: '0.875rem', fontWeight: 600, fontFamily: 'var(--font-montserrat)' }}>
                     ⚠️ {errorMsg}
                   </div>
-                  {suggestedTimes.length > 0 && (
+                  {suggestedSlots.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
-                      <p style={{ width: '100%', fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)', fontFamily: 'var(--font-montserrat)' }}>Suggested alternative times:</p>
-                      {suggestedTimes.map((time) => (
-                        <button key={time} type="button"
-                          onClick={() => { setFormData(prev => ({ ...prev, time })); setStatus('idle'); setErrorMsg(''); setSuggestedTimes([]); }}
-                          style={{ background: 'rgba(139,28,28,0.08)', color: '#8B1C1C', border: '1px solid rgba(139,28,28,0.25)', borderRadius: '50px', padding: '0.4rem 1rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-montserrat)' }}
-                        >{time}</button>
-                      ))}
+                      <p style={{ width: '100%', fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)', fontFamily: 'var(--font-montserrat)' }}>Available alternatives:</p>
+                      {suggestedSlots.map((slot) => {
+                        const isSameDay = slot.date === formData.date;
+                        const label = isSameDay
+                          ? slot.time
+                          : `${new Date(slot.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${slot.time}`;
+                        return (
+                          <button key={`${slot.date}-${slot.time}`} type="button"
+                            onClick={() => { setFormData(prev => ({ ...prev, date: slot.date, time: slot.time })); setStatus('idle'); setErrorMsg(''); setSuggestedSlots([]); }}
+                            style={{ background: 'rgba(139,28,28,0.08)', color: '#8B1C1C', border: '1px solid rgba(139,28,28,0.25)', borderRadius: '50px', padding: '0.4rem 1rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-montserrat)' }}
+                          >{label}</button>
+                        );
+                      })}
                     </div>
                   )}
                 </motion.div>

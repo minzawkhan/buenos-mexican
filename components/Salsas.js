@@ -1,126 +1,184 @@
 'use client';
 
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Autoplay, FreeMode } from 'swiper/modules';
 import Image from 'next/image';
 
 const salsas = [
-  { name: "Pico De Gallo", level: 1, desc: "Fresh and chunky, this raw salsa mixes tomatoes, onions, cilantro, lime, and jalapeños for a zesty, crisp bite that brightens any dish.", color: "#4CAF50", image: "/images/pico_final.webp" },
-  { name: "Salsa Verde", level: 1, desc: "Made with green tomatoes, green chilies, and fresh herbs, this tangy green salsa delivers a sharp, citrusy punch with just the right heat.", color: "#8BC34A", image: "/images/verde_final.webp" },
-  { name: "Mango Salsa", level: 1, desc: "A tropical twist combining juicy mangoes, red onion, lime, and chili—sweet, spicy, and vibrant, perfect with grilled meats or seafood.", color: "#FFC107", image: "/images/mango_final.webp" },
-  { name: "Pineapple Salsa", level: 1, desc: "Sweet meets heat in this sunny salsa made with fresh pineapple, jalapeños, red onions, and cilantro—bright, bold, and refreshing.", color: "#FFEB3B", image: "/images/pineapple_final.webp" },
-  { name: "Salsa Roja", level: 2, desc: "A classic red salsa featuring roasted tomatoes, chilies, garlic, and onions—smooth, savory, and deeply flavorful with a kick.", color: "#FF9800", image: "/images/roja_centered.webp" },
-  { name: "Charred Tomato Salsa", level: 3, desc: "Smoky and rich, this salsa is made with flame-roasted tomatoes, garlic, and jalapeño peppers, delivering a deep, earthy heat.", color: "#F44336", image: "/images/charred_tomato_centered.webp" },
-  { name: "Buenos Hotcha", level: 4, desc: "A fiery red hot sauce bursting with bold chili flavor and a tangy finish—Buenos Hotcha brings the heat.", color: "#B71C1C", image: "/images/hotcha_centered_v2.webp" },
+  { name: "Pico De Gallo",       level: 1, desc: "Fresh and chunky—tomatoes, onions, cilantro, lime & jalapeños for a zesty, crisp bite.",        image: "/images/pico_final.webp" },
+  { name: "Salsa Verde",          level: 1, desc: "Green tomatoes, chilies & fresh herbs deliver a sharp, citrusy punch with just the right heat.", image: "/images/verde_final.webp" },
+  { name: "Mango Salsa",          level: 1, desc: "Juicy mangoes, red onion, lime & chili—sweet, spicy & vibrant. Perfect with grilled meats.",   image: "/images/mango_final.webp" },
+  { name: "Pineapple Salsa",      level: 1, desc: "Sweet meets heat—fresh pineapple, jalapeños, red onions & cilantro. Bright and refreshing.",    image: "/images/pineapple_final.webp" },
+  { name: "Salsa Roja",           level: 2, desc: "Roasted tomatoes, chilies, garlic & onions—smooth, savory & deeply flavorful with a kick.",      image: "/images/roja_centered.webp" },
+  { name: "Charred Tomato Salsa", level: 3, desc: "Smoky & rich—flame-roasted tomatoes, garlic & jalapeños deliver a deep, earthy heat.",          image: "/images/charred_tomato_centered.webp" },
+  { name: "Buenos Hotcha",        level: 4, desc: "Our fiery house hot sauce—bold chili flavor with a tangy finish. Buenos Hotcha brings the heat!", image: "/images/hotcha_centered_v2.webp" },
 ];
 
-const SalsaCard = ({ salsa, index }) => {
-  const x = useMotionValue(0.5);
-  const y = useMotionValue(0.5);
-
-  const rotateX = useTransform(y, [0, 1], [10, -10]);
-  const rotateY = useTransform(x, [0, 1], [-10, 10]);
-
-  const springX = useSpring(rotateX, { stiffness: 300, damping: 30 });
-  const springY = useSpring(rotateY, { stiffness: 300, damping: 30 });
-
-  function handleMouseMove(event) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    x.set((event.clientX - rect.left) / rect.width);
-    y.set((event.clientY - rect.top) / rect.height);
-  }
-
-  function handleMouseLeave() {
-    x.set(0.5);
-    y.set(0.5);
-  }
-
-  function handleTouchStart() {
-    x.set(0.5);
-    y.set(0.5);
-  }
-
+function SpiceMeter({ level }) {
   return (
-    <motion.div 
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      onTouchStart={handleTouchStart}
-      initial={{ opacity: 0, y: 40 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-50px" }}
-      transition={{ delay: 0.2 + ((index % 5) * 0.15), duration: 0.6, ease: "easeOut" }}
-      className="flex flex-col md:flex-row gap-6 items-center salsa-card"
-      style={{
-        rotateX: springX,
-        rotateY: springY,
-        transformStyle: 'preserve-3d',
-        backgroundColor: 'var(--background)', 
-        padding: '1.5rem', 
-        borderRadius: '16px', 
-        boxShadow: '0 10px 30px rgba(62,39,35,0.08)',
-        cursor: 'pointer',
-        position: 'relative'
-      }}
-    >
-      {/* Decorative rounded left border that perfectly matches card border-radius */}
-      <div style={{
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: '8px',
-        backgroundColor: salsa.color,
-        borderTopLeftRadius: '16px',
-        borderBottomLeftRadius: '16px',
-        zIndex: 5
-      }} />
-
-      <div className="salsa-image-container" style={{ flexShrink: 0, width: '120px', height: '120px', borderRadius: '50%', overflow: 'hidden', border: `4px solid ${salsa.color}`, boxShadow: '0 4px 15px rgba(0,0,0,0.1)', transform: 'translateZ(30px)', position: 'relative', zIndex: 10 }}>
-        <Image src={salsa.image} alt={salsa.name || 'Salsa'} fill sizes="120px" style={{ objectFit: 'cover' }} />
-      </div>
-
-      <div style={{ flex: 1, transform: 'translateZ(20px)', zIndex: 10 }}>
-        <div className="flex items-center gap-4 flex-wrap" style={{ marginBottom: '0.75rem' }}>
-          <h3 className="text-foreground" style={{ fontSize: '1.5rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1.5px' }}>{salsa.name}</h3>
-          <div style={{
-            backgroundColor: salsa.level === 1 ? '#33691E' : salsa.level === 2 ? '#FF9800' : salsa.level === 3 ? '#8B1C1C' : '#4A0000',
-            color: 'white',
-            padding: '4px 16px',
-            borderRadius: '20px',
-            fontWeight: 'bold',
-            fontSize: '0.875rem',
-            transform: 'translateZ(10px)',
-            boxShadow: salsa.level === 4 ? '0 0 10px rgba(180,0,0,0.6)' : 'none'
-          }}>
-            🌶️ Spice Level {salsa.level}
-          </div>
-        </div>
-        <p className="text-gray" style={{ lineHeight: '1.6', fontSize: '1.05rem', transform: 'translateZ(5px)' }}>{salsa.desc}</p>
-      </div>
-    </motion.div>
+    <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+      {[1, 2, 3, 4].map(i => (
+        <span
+          key={i}
+          style={{
+            fontSize: '0.85rem',
+            lineHeight: 1,
+            filter: i <= level ? 'none' : 'grayscale(1)',
+            opacity: i <= level ? 1 : 0.3,
+          }}
+        >
+          🌶️
+        </span>
+      ))}
+    </div>
   );
-};
+}
 
 export default function Salsas() {
   return (
-    <section id="salsas" className="py-24 relative perspective-container">
-      <motion.div 
+    <section
+      id="salsas"
+      className="py-24"
+      style={{
+        borderTop: '2px dashed var(--secondary)',
+        background: 'linear-gradient(to bottom, rgba(244, 236, 216, 0.5), transparent)',
+      }}
+    >
+      <motion.div
         initial={{ opacity: 0, y: 60 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-50px" }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        className="container relative z-10 solid-content-card" style={{ maxWidth: '900px' }}
+        viewport={{ once: true, margin: '-50px' }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
+        className="container"
       >
-        <div className="text-center" style={{ marginBottom: '4rem' }}>
-          <h2 className="script-font text-primary" style={{ fontSize: 'clamp(3.5rem, 6vw, 5rem)', marginBottom: '0.5rem', textShadow: 'none' }}>Our Salsas</h2>
-          <p className="text-gray text-xl" style={{ fontStyle: 'italic' }}>(Ranked in order of spiciness)</p>
-        </div>
-
-        <div className="flex flex-col gap-6" style={{ perspective: '1200px' }}>
-          {salsas.map((salsa, index) => (
-            <SalsaCard key={salsa.name} salsa={salsa} index={index} />
-          ))}
+        {/* ── Header (matches "Our Quick Menu") ── */}
+        <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
+          <h2 className="script-font neon-gold" style={{ fontSize: 'clamp(3rem, 6vw, 5rem)', fontWeight: 'bold', lineHeight: 1.1 }}>
+            Our Salsas
+          </h2>
+          <p
+            className="text-gray"
+            style={{
+              fontSize: '1.1rem', marginTop: '0.75rem', fontWeight: 600,
+              backgroundColor: 'rgba(255, 215, 0, 0.15)', padding: '4px 12px',
+              borderRadius: '4px', display: 'inline-block',
+            }}
+          >
+            House-made fresh daily · <span className="text-primary">ranked by spice</span>
+          </p>
         </div>
       </motion.div>
+
+      {/* ── Salsa marquee (auto-scrolls right → left, opposite the Quick Menu) ── */}
+      <div className="salsa-swiper-container" style={{ padding: '20px 0' }}>
+        <Swiper
+          modules={[Autoplay, FreeMode]}
+          spaceBetween={28}
+          slidesPerView={1.15}
+          loop={true}
+          freeMode={true}
+          speed={4000}
+          autoplay={{ delay: 0, disableOnInteraction: false, pauseOnMouseEnter: true, reverseDirection: true }}
+          grabCursor={true}
+          breakpoints={{ 640: { slidesPerView: 2.2 }, 1024: { slidesPerView: 4 } }}
+          className="salsa-swiper"
+        >
+          {salsas.map((salsa) => (
+            <SwiperSlide key={salsa.name}>
+              <a href="/menu" className="salsa-card">
+                {/* Photo band (top) */}
+                <div className="salsa-card-photo">
+                  <Image
+                    src={salsa.image}
+                    alt={salsa.name}
+                    fill
+                    sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 25vw"
+                    style={{ objectFit: 'cover' }}
+                  />
+                  {/* soft fade into the panel below */}
+                  <div className="salsa-card-photo-fade" />
+                  {/* Spice badge — top right */}
+                  <div className="salsa-card-spice">
+                    <SpiceMeter level={salsa.level} />
+                  </div>
+                </div>
+
+                {/* Info panel (bottom) */}
+                <div className="salsa-card-info">
+                  <h3
+                    className="script-font"
+                    style={{
+                      fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--neon-gold)',
+                      letterSpacing: '0.5px', textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+                      marginBottom: '0.45rem', lineHeight: 1.15,
+                    }}
+                  >
+                    {salsa.name}
+                  </h3>
+                  <p style={{ color: '#F3E9D8', fontSize: '0.82rem', lineHeight: 1.55, opacity: 0.92 }}>
+                    {salsa.desc}
+                  </p>
+                </div>
+              </a>
+            </SwiperSlide>
+          ))}
+        </Swiper>
+      </div>
+
+      <style>{`
+        .salsa-card {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          border-radius: 24px;
+          overflow: hidden;
+          cursor: pointer;
+          border: 2px dashed var(--secondary);
+          box-shadow: 0 8px 24px rgba(62, 39, 35, 0.12);
+          background: rgba(62, 39, 35, 0.96);
+        }
+        .salsa-card-photo {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 1 / 1;
+          flex-shrink: 0;
+          overflow: hidden;
+        }
+        .salsa-card-photo :global(img) { transition: transform 0.7s ease; }
+        .salsa-card:hover .salsa-card-photo :global(img) { transform: scale(1.08); }
+        .salsa-card-photo-fade {
+          position: absolute;
+          left: 0; right: 0; bottom: 0;
+          height: 25%;
+          background: linear-gradient(to top, rgba(62, 39, 35, 0.18), transparent);
+          z-index: 5;
+          pointer-events: none;
+        }
+        .salsa-card-spice {
+          position: absolute;
+          top: 0.75rem;
+          right: 0.75rem;
+          z-index: 20;
+          background: rgba(62, 39, 35, 0.72);
+          backdrop-filter: blur(6px);
+          padding: 5px 10px;
+          border-radius: 20px;
+          border: 1px solid rgba(255, 215, 0, 0.35);
+        }
+        .salsa-card-info {
+          height: 138px;
+          z-index: 20;
+          padding: 1.05rem 1.25rem 1.25rem;
+          border-top: 2px dashed var(--secondary);
+        }
+        .salsa-card-info p {
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+      `}</style>
     </section>
   );
 }

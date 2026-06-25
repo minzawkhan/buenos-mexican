@@ -12,161 +12,9 @@ const TABS = [
   { id: 'monitor',    label: 'System Monitor',  icon: '🔧' },
 ];
 
-// ─── Login Screen ────────────────────────────────────────────────────────────
-function LoginScreen({ F }) {
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError]       = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [showPw, setShowPw]     = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-    if (err) setError('Incorrect email or password.');
-    setLoading(false);
-  };
-
-  return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#FAF6F2',
-      fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
-      WebkitFontSmoothing: 'antialiased',
-      MozOsxFontSmoothing: 'grayscale',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px',
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '400px',
-        background: '#fff',
-        borderRadius: '20px',
-        border: '1px solid #E8E0D8',
-        boxShadow: '0 4px 32px rgba(62,39,35,0.08)',
-        padding: '40px 36px',
-      }}>
-
-        {/* Heading */}
-        <div style={{ marginBottom: '32px' }}>
-          <h1 style={{ margin: '0 0 6px', fontSize: '24px', fontWeight: 400, color: '#FF3333', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-            Buenos Mexican
-          </h1>
-          <p style={{ margin: 0, fontSize: '13px', fontWeight: 400, color: '#A08070', letterSpacing: '0.03em' }}>
-            Admin · Sign in
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-          {/* Email */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 700, color: '#5D4037' }}>
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              required
-              autoComplete="email"
-              autoFocus
-              style={{
-                padding: '13px 16px', borderRadius: '10px',
-                border: '1.5px solid #D6C9BE',
-                fontSize: '15px', fontWeight: 500, color: '#3E2723',
-                fontFamily: 'inherit', outline: 'none', background: '#FAF6F2',
-                transition: 'border-color 0.15s, box-shadow 0.15s',
-              }}
-              onFocus={e => { e.target.style.borderColor = '#8C7365'; e.target.style.boxShadow = '0 0 0 3px rgba(140,115,101,0.12)'; e.target.style.background = '#fff'; }}
-              onBlur={e => { e.target.style.borderColor = '#D6C9BE'; e.target.style.boxShadow = 'none'; e.target.style.background = '#FAF6F2'; }}
-            />
-          </div>
-
-          {/* Password */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '14px', fontWeight: 700, color: '#5D4037' }}>
-              Password
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showPw ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••••"
-                required
-                autoComplete="current-password"
-                style={{
-                  width: '100%', padding: '13px 48px 13px 16px', borderRadius: '10px',
-                  border: '1.5px solid #D6C9BE',
-                  fontSize: '15px', fontWeight: 500, color: '#3E2723',
-                  fontFamily: 'inherit', outline: 'none', background: '#FAF6F2',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.15s, box-shadow 0.15s',
-                }}
-                onFocus={e => { e.target.style.borderColor = '#8C7365'; e.target.style.boxShadow = '0 0 0 3px rgba(140,115,101,0.12)'; e.target.style.background = '#fff'; }}
-                onBlur={e => { e.target.style.borderColor = '#D6C9BE'; e.target.style.boxShadow = 'none'; e.target.style.background = '#FAF6F2'; }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPw(v => !v)}
-                tabIndex={-1}
-                style={{
-                  position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: '16px', color: '#A0897C', padding: '4px', lineHeight: 1,
-                }}
-              >
-                {showPw ? '🙈' : '👁️'}
-              </button>
-            </div>
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div style={{
-              padding: '12px 16px', borderRadius: '10px',
-              background: '#fef2f2', border: '1px solid #fecaca',
-              fontSize: '14px', fontWeight: 600, color: '#b91c1c',
-              display: 'flex', alignItems: 'center', gap: '8px',
-            }}>
-              <span>⚠️</span> {error}
-            </div>
-          )}
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              marginTop: '4px', padding: '14px',
-              borderRadius: '12px', border: 'none',
-              background: loading ? '#C4A99A' : '#3E2723',
-              color: '#FDF6EE',
-              fontSize: '16px', fontWeight: 800,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontFamily: 'inherit', letterSpacing: '0.02em',
-              boxShadow: loading ? 'none' : '0 4px 16px rgba(62,39,35,0.22)',
-              transition: 'background 0.15s',
-            }}
-          >
-            {loading ? 'Signing in…' : 'Sign In'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Admin Page ──────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const [session, setSession]     = useState(undefined); // undefined = loading
+  const [session, setSession]     = useState(null);
   const [tab, setTab]             = useState('bookings');
   const [isOnline, setIsOnline]   = useState(false);
   const [syncing, setSyncing]     = useState(false);
@@ -174,14 +22,10 @@ export default function AdminPage() {
   const prevOnline                = useRef(false);
   const syncTimer                 = useRef(null);
 
-  // ── Auth ──
+  // ── Auth — session is kept in sync for the header (email display + sign out)
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session ?? null);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      setSession(session ?? null);
-    });
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s ?? null));
     return () => subscription.unsubscribe();
   }, []);
 
@@ -221,25 +65,7 @@ export default function AdminPage() {
 
   const F = 'var(--font-montserrat)';
 
-  // Loading — checking session
-  if (session === undefined) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ width: '36px', height: '36px', borderTop: '3px solid #3E2723', borderRight: '3px solid #E5E7EB', borderBottom: '3px solid #E5E7EB', borderLeft: '3px solid #E5E7EB', borderRadius: '50%', animation: 'adminspin 0.7s linear infinite', margin: '0 auto 14px' }} />
-          <p style={{ fontSize: '13px', fontWeight: 700, color: '#6B7280', fontFamily: F }}>Loading…</p>
-        </div>
-        <style>{`@keyframes adminspin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
-  // Not logged in — show login screen
-  if (!session) {
-    return <LoginScreen onLogin={() => {}} F={F} />;
-  }
-
-  // Logged in — show dashboard
+  // Logged in — show dashboard (middleware guarantees authentication before this renders)
   return (
     <div style={{ minHeight: '100vh', background: '#F3F4F6', fontFamily: F }}>
 
@@ -278,7 +104,7 @@ export default function AdminPage() {
             {/* Signed-in user + sign out */}
             <div className="admin-user" style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '14px', borderLeft: '1px solid #E5E7EB' }}>
               <span style={{ fontSize: '12px', fontWeight: 600, color: '#6B7280', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {session.user.email}
+                {session?.user?.email}
               </span>
               <button
                 onClick={handleSignOut}

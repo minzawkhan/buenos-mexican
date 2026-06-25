@@ -1,34 +1,37 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-// In-memory rate limiter Map: IP -> array of timestamps
-const rateLimitMap = new Map();
+// ── Rate limiting ────────────────────────────────────────────────────────────
+// Two-layer approach:
+//   1. In-memory pre-check  — catches obvious bots instantly, no DB round trip
+//   2. Supabase persistence — survives Vercel deploys / serverless cold starts
 
-function checkRateLimit(ip) {
+// Layer 1: in-memory (5 hits / 30 s per IP → obvious bot)
+const _memCache = new Map();
+function _memCheck(ip) {
   const now = Date.now();
-  const oneMinuteAgo = now - 60 * 1000;
-
-  // Clean up expired entries across all IPs in the Map
-  for (const [key, timestamps] of rateLimitMap.entries()) {
-    const valid = timestamps.filter(t => t > oneMinuteAgo);
-    if (valid.length === 0) {
-      rateLimitMap.delete(key);
-    } else {
-      rateLimitMap.set(key, valid);
-    }
-  }
-
-  // Check rate limit for this IP
-  const userTimestamps = rateLimitMap.get(ip) || [];
-  const activeTimestamps = userTimestamps.filter(t => t > oneMinuteAgo);
-
-  if (activeTimestamps.length >= 3) {
-    return true;
-  }
-
-  activeTimestamps.push(now);
-  rateLimitMap.set(ip, activeTimestamps);
+  const window = 30_000;
+  const times = (_memCache.get(ip) || []).filter(t => now - t < window);
+  if (times.length >= 5) return true;
+  times.push(now);
+  _memCache.set(ip, times);
   return false;
+}
+
+// Layer 2: Supabase — 3 attempts per email in 5 minutes (persists across deploys)
+async function _dbCheck(email) {
+  try {
+    const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { count, error } = await supabase
+      .from('booking_attempts')
+      .select('*', { count: 'exact', head: true })
+      .eq('email', email.toLowerCase().trim())
+      .gte('created_at', since);
+    if (error) return false; // fail open — don't block real users if DB is down
+    return (count || 0) >= 3;
+  } catch {
+    return false;
+  }
 }
 
 async function verifyTurnstile(token, ip) {
@@ -58,13 +61,10 @@ export async function POST(request) {
                request.headers.get('x-real-ip') || 
                '127.0.0.1';
 
-    // 1. Rate Limiting Check
-    if (checkRateLimit(ip)) {
+    // 1. Rate Limiting — Layer 1: fast in-memory check (no DB)
+    if (_memCheck(ip)) {
       return NextResponse.json(
-        { 
-          error: 'Too many booking requests. Please wait a minute before trying again.',
-          message: 'Too many booking requests. Please wait a minute before trying again.'
-        },
+        { error: 'Too many requests. Please wait a moment before trying again.', message: 'Too many requests. Please wait a moment before trying again.' },
         { status: 429 }
       );
     }
@@ -72,7 +72,26 @@ export async function POST(request) {
     const body = await request.json();
     const { name, email, phone, date, time, partySize, website, turnstileToken } = body;
 
-    // 2. Honeypot Validation
+    // 1b. Rate Limiting — Layer 2: persistent Supabase check by email
+    if (email && await _dbCheck(email)) {
+      return NextResponse.json(
+        { error: 'Too many booking attempts. Please wait 5 minutes before trying again.', message: 'Too many booking attempts. Please wait 5 minutes before trying again.' },
+        { status: 429 }
+      );
+    }
+
+    // 2. Monday closed-day check
+    if (date) {
+      const day = new Date(date + 'T00:00:00').getDay();
+      if (day === 1) {
+        return NextResponse.json(
+          { error: 'We are closed on Mondays. Please choose another day.', message: 'We are closed on Mondays. Please choose another day.' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 3. Honeypot Validation
     if (website) {
       console.warn(`[Bot Blocked] Honeypot filled by IP ${ip}. website = "${website}"`);
       await supabase.from('booking_attempts').insert([{
@@ -121,7 +140,7 @@ export async function POST(request) {
     if (error || (data && data.error)) {
       const errString = error?.message || data?.error || '';
       const message = data?.message || errString;
-      const suggestedTimes = data?.suggested_times || [];
+      const suggestedSlots = data?.suggested_slots || [];
       
       const isConflict = 
         error?.status === 409 || 
@@ -142,7 +161,7 @@ export async function POST(request) {
       }]);
 
       return NextResponse.json(
-        { error: errString, message, suggested_times: suggestedTimes },
+        { error: errString, message, suggested_slots: suggestedSlots },
         { status: isConflict ? 409 : 400 }
       );
     }

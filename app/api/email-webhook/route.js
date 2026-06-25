@@ -55,9 +55,6 @@ function classifyBounce(bounceData) {
 export async function POST(request) {
   try {
     const payload = await request.json();
-    console.log('=== RESEND WEBHOOK RECEIVED ===');
-    console.log('Event Type:', payload.type);
-    console.log('Payload Data:', JSON.stringify(payload.data, null, 2));
 
     const eventType = payload.type;
     const eventData = payload.data;
@@ -109,7 +106,7 @@ export async function POST(request) {
       bounceClassification = classifyBounce(eventData.bounce);
       newStatus = 'bounced';
       errorMessage = `[${bounceClassification.toUpperCase()} BOUNCE] ${eventData.bounce?.message || 'Email Bounced'}`;
-      console.log(`Bounce classification for ${recipientEmail}: ${bounceClassification} bounce`);
+;
 
     } else if (eventType === 'email.failed') {
       newStatus = 'failed';
@@ -122,7 +119,6 @@ export async function POST(request) {
 
     // 3. Prevent duplicate processing
     if (logEntry.status === newStatus) {
-      console.log(`Log status for Resend ID ${resendId} is already '${newStatus}'. Skipping update.`);
       return NextResponse.json({ success: true, message: 'Status already up-to-date' });
     }
 
@@ -199,7 +195,6 @@ export async function POST(request) {
       }
     }
 
-    console.log('=== WEBHOOK PROCESS SUCCESS ===');
     return NextResponse.json({ success: true });
 
   } catch (err) {

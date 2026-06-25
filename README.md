@@ -1,348 +1,326 @@
-# 🌮 Buenos Mexican Cuisine — Restaurant Reservation Platform
+# Buenos Mexican Cuisine — Restaurant Reservation Platform
 
-A production-grade restaurant reservation and management system for Buenos Mexican Cuisine, Pattaya. Built on **Next.js 15** with **Supabase** for real-time PostgreSQL data, **WebSocket-driven live dashboards**, a concurrency-safe booking engine, and a multi-channel notification pipeline.
+A production-grade restaurant reservation and management system for Buenos Mexican Cuisine, Pattaya. Built on **Next.js 16** with **Supabase** for real-time PostgreSQL data, **WebSocket-driven live dashboards**, a concurrency-safe booking engine, and a multi-channel notification pipeline.
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
-- [Project Overview](#-project-overview)
-- [Architecture](#-architecture)
-- [Feature Documentation](#-feature-documentation)
+- [Project Overview](#project-overview)
+- [Architecture](#architecture)
+- [Feature Documentation](#feature-documentation)
   - [1. Real-time Streaming](#1-real-time-streaming)
   - [2. Reservation Management Actions](#2-reservation-management-actions)
   - [3. Filters & Search Controls](#3-filters--search-controls)
   - [4. Interactive Statistics Cards](#4-interactive-statistics-cards)
-  - [5. Smart Table Assignment (RPC)](#5-smart-table-assignment-rpc)
+  - [5. Smart Daily Cap & Cross-Day Suggestions (RPC)](#5-smart-daily-cap--cross-day-suggestions-rpc)
   - [6. Interactive Location Map](#6-interactive-location-map)
   - [7. Grab Delivery Integration](#7-grab-delivery-integration)
   - [8. Social Media & Customer Engagement](#8-social-media--customer-engagement)
-- [Security & Fallback Implementations](#-security--fallback-implementations)
+  - [9. Newsletter System](#9-newsletter-system)
+- [Security & Protection](#security--protection)
+  - [Admin Route Protection (Proxy)](#admin-route-protection-proxy)
   - [Cloudflare Turnstile](#cloudflare-turnstile)
   - [Honeypot Field](#honeypot-field)
-  - [Rate Limiting](#rate-limiting)
-  - [Frontend Offline-Fallback](#frontend-offline-fallback)
-- [Local Setup & Environment Variables](#-local-setup--environment-variables)
-- [Database Migrations](#-database-migrations)
-- [Project Structure](#-project-structure)
-- [Notification Pipeline](#-notification-pipeline)
+  - [Rate Limiting (Two-Layer)](#rate-limiting-two-layer)
+  - [Monday Closed Day](#monday-closed-day)
+  - [Frontend Offline Fallback](#frontend-offline-fallback)
+- [Local Setup & Environment Variables](#local-setup--environment-variables)
+- [Database Setup](#database-setup)
+- [Project Structure](#project-structure)
+- [Notification Pipeline](#notification-pipeline)
 
 ---
 
-## 🌟 Project Overview
+## Project Overview
 
-Buenos Mexican Cuisine is a premium restaurant platform that handles the full lifecycle of table reservations — from customer-facing booking forms to a real-time admin dashboard for restaurant staff.
+Buenos Mexican Cuisine is a premium restaurant platform handling the full lifecycle of table reservations — from customer-facing booking forms to a real-time admin dashboard for restaurant staff.
 
 ### Core Tech Stack
 
 | Layer | Technology | Purpose |
 |:---|:---|:---|
-| **Frontend** | Next.js 15 (App Router), React 19 | Server/client rendering, routing, API routes |
+| **Frontend** | Next.js 16 (App Router), React 19 | Server/client rendering, routing, API routes |
 | **Database** | PostgreSQL via Supabase | Relational data, RPC functions, Row Level Security |
+| **Auth** | Supabase Auth + `@supabase/ssr` | Cookie-based sessions, server-side route protection |
 | **Real-time** | Supabase Realtime (WebSockets) | Live dashboard updates via WAL replication |
-| **Animations** | Framer Motion, HTML5 Canvas | 3D springs, particle effects, micro-interactions |
-| **Styling** | Vanilla CSS (HSL variables) | Premium design system with rustic theme |
+| **Animations** | Framer Motion, Swiper.js | Scroll effects, marquee carousels, micro-interactions |
+| **Styling** | Vanilla CSS (CSS variables) | Premium design system with warm rustic theme |
 | **Email** | Resend API | Transactional branded HTML emails |
 | **Notifications** | LINE Messaging API | Instant push alerts to restaurant managers |
-| **Data Sync** | Google Apps Script | Automated Google Sheets backup of reservations |
+| **Data Sync** | Google Apps Script | Automated Google Sheets backup of confirmed reservations |
 | **Security** | Cloudflare Turnstile | Invisible CAPTCHA bot protection |
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### Booking Flow
 
-```mermaid
-sequenceDiagram
-    participant C as Customer
-    participant F as Next.js Frontend
-    participant A as API Route (/api/bookings)
-    participant CF as Cloudflare Turnstile
-    participant DB as Supabase PostgreSQL
-    participant EF as Edge Function
-    participant R as Resend Email
-    participant L as LINE Bot
-    participant G as Google Sheets
-
-    C->>F: Fill booking form
-    F->>A: POST /api/bookings (with Turnstile token)
-    A->>A: Rate limit check (3/min/IP)
-    A->>A: Honeypot validation
-    A->>CF: Verify Turnstile token
-    CF-->>A: ✅ Human verified
-    A->>DB: RPC create_booking()
-    DB->>DB: FOR UPDATE SKIP LOCKED (find table)
-    DB-->>A: {success, booking_id, table_id}
-    A-->>F: 200 OK
-    F-->>C: ✅ Booking Confirmed!
-    DB->>EF: pg_net trigger (async HTTP POST)
-    EF->>R: Send confirmation email
-    EF->>L: Push notification to manager
-    EF->>G: Append row to spreadsheet
+```
+Customer fills form
+  → POST /api/bookings
+      → In-memory rate check (5 req / 30s per IP)
+      → Supabase rate check (3 req / 5 min per email)
+      → Monday closed-day check
+      → Honeypot validation
+      → Cloudflare Turnstile verification
+      → create_booking() RPC
+          → Daily cap check (max N bookings per day)
+          → FOR UPDATE SKIP LOCKED table assignment
+          → If day full → suggest slots on next 7 days
+          → If slot full → suggest nearby times same day
+          → INSERT booking row
+      → 200 OK → Customer sees confirmation
+      → pg_net async trigger → Edge Function
+          → Resend email to customer
+          → LINE push to manager
+          → Google Sheets row append (confirmed only)
 ```
 
 ### Admin Dashboard Real-time Flow
 
-```mermaid
-flowchart LR
-    DB[(PostgreSQL)] -->|WAL changes| RT[Supabase Realtime]
-    RT -->|WebSocket| WS[Browser WebSocket]
-    WS -->|INSERT| A[Add booking card]
-    WS -->|UPDATE| B[Update status badge]
-    WS -->|DELETE| C[Remove card]
-    WS -->|Any change| D[Update stat counters]
+```
+PostgreSQL WAL
+  → Supabase Realtime
+      → WebSocket (browser)
+          → INSERT  → add booking card + audio chime
+          → UPDATE  → update status badge in-place
+          → DELETE  → remove card with exit animation
+          → Any     → recalculate stat counters
 ```
 
 ---
 
-## 📚 Feature Documentation
+## Feature Documentation
 
 ### 1. Real-time Streaming
 
-The admin dashboard receives live updates without polling or page refreshes, powered by Supabase Realtime Channels.
+The admin dashboard receives live updates without polling, powered by Supabase Realtime Channels.
 
-**How it works:**
+1. PostgreSQL's WAL captures every `INSERT`, `UPDATE`, `DELETE` on the `bookings` table.
+2. Supabase reads the WAL and broadcasts over the `supabase_realtime` publication.
+3. `AdminDashboard.js` subscribes to the `admin-bookings` channel via `supabase.channel()`.
+4. Each event type triggers specific React state mutations.
+5. On reconnect after a disconnect, a full `fetchBookings()` re-sync fires to catch missed events.
 
-1. **Write-Ahead Log (WAL)**: PostgreSQL's WAL captures every `INSERT`, `UPDATE`, and `DELETE` on the `bookings` table.
-2. **Supabase Realtime**: Supabase reads the WAL and broadcasts changes over the `supabase_realtime` publication.
-3. **WebSocket Channels**: The `AdminDashboard` component subscribes to the `admin-bookings` channel via `supabase.channel()`.
-4. **State Updates**: Each event type triggers specific React state mutations:
-   - `INSERT` → Prepends the new booking and plays an audio notification chime
-   - `UPDATE` → Replaces the booking in-place (e.g., status change to `confirmed`)
-   - `DELETE` → Removes the booking card with an exit animation
-5. **Channel Health Monitoring**: The subscription callback tracks connection status. If the channel reconnects after a disconnect (`SUBSCRIBED` after prior connection), it triggers a **full data re-sync** to catch any events missed during the outage.
-
-**Key files:**
-- `components/AdminDashboard.js` — Channel subscriptions and state management
-- `app/admin/page.js` — Connection monitoring (navigator + Supabase channel)
+**Key files:** `components/AdminDashboard.js`, `app/admin/page.js`
 
 ---
 
 ### 2. Reservation Management Actions
 
-The admin dashboard supports three state-change actions on each booking, with distinct consequences:
+Three state-change actions are available per booking:
 
-```mermaid
-stateDiagram-v2
-    [*] --> pending : Customer submits form
-    pending --> confirmed : Staff clicks Confirm
-    pending --> cancelled : Staff clicks Cancel
-    confirmed --> cancelled : Staff clicks Cancel
-    cancelled --> confirmed : Staff clicks Confirm
-    pending --> [*] : Staff clicks Delete
-    confirmed --> [*] : Staff clicks Delete
-    cancelled --> [*] : Staff clicks Delete
-```
-
-| Action | Effect on Database | Effect on Table Availability |
+| Action | DB Effect | Availability Effect |
 |:---|:---|:---|
-| **Confirm** | Sets `status = 'confirmed'` | Table remains occupied for the slot |
-| **Cancel** | Sets `status = 'cancelled'` | Table becomes available (excluded from booking queries via `status != 'cancelled'`) |
-| **Delete** | Hard deletes the row | Table becomes available immediately |
+| **Confirm** | `status = 'confirmed'` | Table remains occupied |
+| **Cancel** | `status = 'cancelled'` | Table freed (excluded from `status != 'cancelled'` queries) |
+| **Delete** | Hard delete row | Table freed immediately |
 
-All actions are **disabled** when the system is offline (`isSystemOnline = false`), with buttons showing reduced opacity and `cursor: not-allowed`. Each action triggers the `on_booking_created` trigger, which fires the notification Edge Function to send updated status emails.
+All actions are disabled when the system is offline (`isSystemOnline = false`).
 
 ---
 
 ### 3. Filters & Search Controls
 
-The dashboard provides three filtering mechanisms that operate client-side for instant responsiveness:
+Three client-side filters chain together — a booking must pass all to appear:
 
 | Filter | Type | Behavior |
 |:---|:---|:---|
-| **Search** | Text input | Filters by `name` or `email` (case-insensitive `.includes()`) |
-| **Date** | Toggle pills (`All Time` / `Today`) | Compares `booking.date` against today's ISO date |
-| **Status** | Dropdown select | Matches exact `status` value (`pending`, `confirmed`, `cancelled`) |
-
-All three filters chain together — a booking must pass all active filters to appear. The search input updates state on every keystroke via `onChange`. For production at scale, consider adding a debounce wrapper (e.g., 300ms) to reduce re-renders on rapid typing.
+| **Search** | Text input | Filters by `name` or `email` (case-insensitive) |
+| **Date** | Toggle pills | `All Time` or `Today` |
+| **Status** | Dropdown | `pending`, `confirmed`, `cancelled` |
 
 ---
 
 ### 4. Interactive Statistics Cards
 
-The dashboard header displays five real-time counters:
+Five real-time counters in the dashboard header, computed directly from React state on every Realtime event:
 
-| Card | Aggregation | Source |
-|:---|:---|:---|
-| **Total** | `bookings.length` | Full bookings array count |
-| **Confirmed** | `.filter(b => b.status === 'confirmed').length` | Status-filtered count |
-| **Pending** | `.filter(b => b.status === 'pending').length` | Status-filtered count |
-| **Today** | `.filter(b => b.date === today).length` | Date-filtered count |
-| **VIP Subscribers** | `SELECT COUNT(*) FROM subscribers WHERE is_active = true` | Separate Supabase query |
-
-These counters update **instantly** on every Realtime event because they are computed from the React `bookings` state array, which is mutated directly by WebSocket events. The VIP Subscribers count re-fetches from the database via a separate `admin-subscribers` Realtime channel.
+| Card | Source |
+|:---|:---|
+| Total | `bookings.length` |
+| Confirmed | `.filter(b => b.status === 'confirmed').length` |
+| Pending | `.filter(b => b.status === 'pending').length` |
+| Today | `.filter(b => b.date === today).length` |
+| VIP Subscribers | `SELECT COUNT(*) FROM subscribers WHERE is_active = true` |
 
 ---
 
-### 5. Smart Table Assignment & Slot Capacity (RPC)
+### 5. Smart Daily Cap & Cross-Day Suggestions (RPC)
 
-The `create_booking` PostgreSQL RPC function handles the entire booking logic atomically at the database level, preventing inconsistencies that could arise from application-level logic.
+The `create_booking` PostgreSQL RPC handles booking logic atomically at the database level.
 
-#### Slot Capacity & Sharing
-- **Limit**: Only **10 bookings** are allowed per time slot on any given day.
-- **Table Allocation**:
-  1. The system first searches for an available, exclusive table that matches the party size (ordered by capacity, with `FOR UPDATE SKIP LOCKED`).
-  2. If all matching tables are currently assigned to active bookings for that slot, but the total number of bookings is still **under 10**, the system automatically falls back to assigning a shared table to satisfy foreign key relationships.
+#### Daily Cap
+
+`max_bookings_per_slot` in `booking_settings` (id=1) controls the **total bookings allowed per calendar day** across all time slots. This is a restaurant-wide daily capacity limit, not a per-time-slot limit.
 
 #### Algorithm
 
-1. **Parse party size**: Strip non-digits from `p_party_size` (e.g., `"9+"` → `9`).
-2. **Check total bookings**: Count all active bookings for the requested `(date, time)`. If there are already 10 or more active bookings, the slot is full.
-3. **Find smallest table**: Query active tables with `capacity >= party_size` and no existing booking for the slot, ordered by `capacity ASC`. Uses **`FOR UPDATE SKIP LOCKED`** to prevent race conditions. If none are exclusive, falls back to sharing an active table.
-4. **If full** → Generate up to **4 alternative times** that have **fewer than 10 bookings**, sorted by **proximity** to the requested time (e.g., if you request 20:00, suggestions might be 20:30, 19:30, 21:00, 19:00).
-5. **If available** → Insert the booking atomically and return `{success, booking_id, table_id}`.
+1. Parse party size (strips non-digits from `p_party_size`, e.g. `"2 People"` → `2`).
+2. Count all non-cancelled bookings for the requested date.
+3. **If day is full** → scan the next 7 days for available capacity. Return up to 4 `{date, time}` suggestion objects sorted by time proximity to the original request.
+4. **If day has capacity** → find the smallest table with `capacity >= party_size` and no conflicting booking for the requested slot using `FOR UPDATE SKIP LOCKED`.
+5. **If requested time slot is full** (all tables taken at that time, but day has remaining capacity) → suggest up to 4 nearby times on the same day.
+6. **If table found** → `INSERT` booking and return `{success, booking_id, table_id}`.
 
-#### Double-Booking Prevention
+#### Concurrency Safety
 
-```
-FOR UPDATE SKIP LOCKED
-```
+`FOR UPDATE SKIP LOCKED` locks the selected table row for the transaction duration. Concurrent requests skip locked rows and find the next available table, or fall back gracefully to the full/suggestion response.
 
-This PostgreSQL clause locks the selected table row for the duration of the transaction. If two customers request the same slot simultaneously:
+A `unique_violation` exception handler catches any remaining edge cases and returns `DOUBLE_BOOKING_CONFLICT` (mapped to HTTP 409 by the API route).
 
-- **Transaction A** locks "Table 1" and proceeds to insert.
-- **Transaction B** skips "Table 1" (it's locked) and finds the next available table (or falls back to sharing if all are claimed, provided the 10 booking limit is not exceeded).
-- If the 10 bookings limit is reached, Transaction B receives the `TIME_SLOT_FULL` error with alternative time recommendations.
+#### Cross-Day Suggestions Frontend
 
-Additionally, a `unique_violation` exception handler catches any edge case where a constraint is violated, returning a distinct `DOUBLE_BOOKING_CONFLICT` error code that the API route maps to HTTP 409.
+When the API returns `suggested_slots: [{date, time}]`, the booking form renders clickable "Available alternatives" buttons. Clicking one updates both the date and time pickers and resubmits. Monday suggestions are filtered out client-side since the restaurant is closed on Mondays.
 
 ---
 
 ### 6. Interactive Location Map
 
-An interactive, responsive Google Maps embed is integrated to help customers easily locate the physical restaurant location.
-
-- **Component**: [Location.js](file:///c:/Buenos%20Mexican/components/Location.js)
-- **Features**:
-  - Embedded Google Maps iframe pointing to the restaurant's location in Jomtien Complex, Pattaya.
-  - Configured with `loading="lazy"` and `referrerPolicy="no-referrer-when-downgrade"` for performance optimization and privacy compliance.
-  - Wrapped inside dynamic, hardware-accelerated `motion.div` from Framer Motion with entry transitions (`whileInView`).
+Google Maps embed in `components/Location.js` pointing to Jomtien Complex, Pattaya. Uses `loading="lazy"` and Framer Motion `whileInView` entry animation.
 
 ---
 
 ### 7. Grab Delivery Integration
 
-Customers can seamlessly order delivery or takeout directly via Grab Food integration.
-
-- **Integration Links**: Prominently linked to the restaurant's Grab food profile: `https://r.grab.com/o/Zn6bI3Ar`.
-- **User Interface Touchpoints**:
-  - **Hero Section**: A large, customized "Order on Grab" call-to-action button with a branded green background.
-  - **Menu page & Footer**: Accessible buttons in the main navigation context/footers, featuring high contrast and semantic styling (`#00B14F` branding).
+Customers can order delivery via Grab Food. The restaurant's Grab profile (`https://r.grab.com/o/Zn6bI3Ar`) is linked from:
+- Hero section CTA button
+- Menu page footer
+- Site footer
 
 ---
 
 ### 8. Social Media & Customer Engagement
 
-Active links to social channels are embedded to facilitate customer reviews, inquiries, and social media updates.
-
-- **Facebook Profile**: Linked directly to the official Buenos Mexican Restaurant Facebook page: `https://www.facebook.com/profile.php?id=61571573732880`.
-- **Instagram Profile**: Linked to the official Instagram account to showcase food visual content.
-- **TikTok Profile**: Connected to the official TikTok channel for video promotions.
-- **Placement**: Clean SVG iconography integrated in the shared footer layout on the landing page and menu page.
+SVG icon links in the shared footer to Facebook, Instagram, and TikTok. Implemented in `components/FooterSocials.js`.
 
 ---
 
-## 🔒 Security & Fallback Implementations
+### 9. Newsletter System
+
+Full newsletter management system accessible via the admin dashboard's "Newsletter" tab.
+
+**Subscriber flow:**
+- Customers subscribe via `NewsletterModal` (triggered from navbar VIP button)
+- Stored in `public.subscribers` with `is_active` flag and `status` field
+- Unsubscribe via tokenized link (`/api/unsubscribe?token=...`)
+
+**Campaign management (`components/NewsletterAdmin.js`):**
+- Rich text editor (react-quill-new) for composing HTML emails
+- Throttled batch send via `/api/newsletter/send` (avoids Resend rate limits)
+- Real-time campaign progress via Supabase Realtime
+- Delivery tracking: `email_blasts` and `email_logs` tables track sent/delivered/bounced per subscriber
+
+**Webhook tracking (`/api/email-webhook`):**
+- Resend POSTs delivery events (delivered, bounced, failed)
+- Smart bounce classification: hard bounces deactivate the subscriber; soft bounces keep them active
+- Updates `email_logs` status and `email_blasts` counters in real time
+
+---
+
+## Security & Protection
+
+### Admin Route Protection (Proxy)
+
+**File:** `proxy.js` (Next.js 16 proxy — equivalent to middleware in earlier versions)
+
+**How it works:**
+- Uses `@supabase/ssr`'s `createServerClient` to read and refresh the Supabase session from cookies on every request to `/admin/*`.
+- Unauthenticated requests to `/admin` are redirected to `/admin/login` before the page renders — no client-side JavaScript runs.
+- Authenticated requests to `/admin/login` are redirected to `/admin` (already logged in).
+
+**Auth flow:**
+1. User navigates to `/admin/login`, enters credentials.
+2. `supabase.auth.signInWithPassword()` sets a secure cookie (via `createBrowserClient` from `@supabase/ssr`).
+3. `proxy.js` reads the cookie on subsequent requests and allows access.
+4. Sign out clears the cookie and proxy redirects back to `/admin/login`.
+
+---
 
 ### Cloudflare Turnstile
 
-**Purpose**: Invisible CAPTCHA that protects the booking form from automated spam without degrading user experience.
+Invisible CAPTCHA protecting the booking form from automated spam.
 
 **Client-side** (`components/Reserve.js`):
-- Loads the Turnstile script with `render=explicit` for manual widget control.
-- Renders an invisible challenge in `#turnstile-container`.
-- Captures the token via `callback` and clears it on `expired-callback` / `error-callback`.
+- Loads the Turnstile script with `render=explicit`.
+- Captures the token via callback; clears on expiry/error.
 - Blocks form submission if `turnstileToken` is empty.
-- Resets the widget after submission errors.
 
 **Server-side** (`app/api/bookings/route.js`):
-- Sends the token + client IP to Cloudflare's `siteverify` endpoint.
-- Rejects the request with HTTP 400 if verification fails.
+- Sends token + client IP to Cloudflare's `siteverify` endpoint.
+- Rejects with HTTP 400 if verification fails.
 
 **Environment variables:**
 ```env
-NEXT_PUBLIC_TURNSTILE_SITE_KEY=<your-site-key>   # Client-side (public)
-TURNSTILE_SECRET_KEY=<your-secret-key>            # Server-side only
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=   # Public (client-side)
+TURNSTILE_SECRET_KEY=             # Private (server-side only)
 ```
+
+> **Test keys** (development only): Site key `1x00000000000000000000AA` / Secret `1x0000000000000000000000000000000AA`
 
 ---
 
 ### Honeypot Field
 
-**Purpose**: A hidden form field invisible to human users but automatically filled by bots scanning for input fields.
-
-**Implementation** (`components/Reserve.js`):
-- A text input named `website` is positioned off-screen (`left: -9999px; top: -9999px; opacity: 0`).
-- Marked with `aria-hidden="true"` and `tabIndex="-1"` to prevent screen reader / tab access.
-
-**Server behavior** (`app/api/bookings/route.js`):
-- If `website` field contains any value, the server logs the bot attempt and returns a **fake success response** (`200 OK` with mock IDs), silently dropping the request without database insertion.
+A hidden `website` input in the booking form, invisible to humans but filled by bots. If the field is non-empty, the server logs the attempt and returns a fake `200 OK` with mock IDs — silently dropping the request without a DB write.
 
 ---
 
-### Rate Limiting
+### Rate Limiting (Two-Layer)
 
-**Purpose**: Prevent a single IP from flooding the booking endpoint.
+**File:** `app/api/bookings/route.js`
 
-**Configuration**: Maximum **3 requests per minute** per IP address.
+Two independent layers protect against flooding:
 
-**Implementation** (`app/api/bookings/route.js`):
-- Uses an in-memory `Map<string, number[]>` storing request timestamps per IP.
-- On each request, expired timestamps (> 60s old) are pruned across all IPs.
-- If the active count for the requesting IP ≥ 3, responds with HTTP 429.
-- IP is extracted from `x-forwarded-for` → `x-real-ip` → fallback `127.0.0.1`.
+| Layer | Mechanism | Limit | Survives deploy? |
+|:---|:---|:---|:---|
+| **In-memory** | `Map<ip, timestamps[]>` | 5 requests / 30s per IP | No (fast pre-check, catches obvious bots) |
+| **Supabase** | Count rows in `booking_attempts` | 3 attempts / 5 min per email | Yes |
 
-> **Note**: This is an in-memory rate limiter suitable for single-instance deployments. For multi-instance or serverless production environments, consider upgrading to a Redis-backed solution (e.g., Upstash Rate Limit).
+The Supabase layer queries existing `booking_attempts` rows for the same email within the last 5 minutes. It fails open — if Supabase is unavailable, real users still get through.
 
----
-
-### Frontend Offline-Fallback
-
-**Purpose**: Gracefully handle network outages in the admin dashboard to prevent data corruption from failed mutations.
-
-**Architecture:**
-
-```mermaid
-flowchart TD
-    A["navigator.onLine"] -->|offline event| D[isOnline = false]
-    A -->|online event| E[isOnline = true]
-    B["Supabase Channel Monitor"] -->|CHANNEL_ERROR / TIMED_OUT / CLOSED| F[isSupabaseConnected = false]
-    B -->|SUBSCRIBED| G[isSupabaseConnected = true]
-    D --> H{"isSystemOnline = isOnline && isSupabaseConnected"}
-    E --> H
-    F --> H
-    G --> H
-    H -->|false| I["🔴 Show Offline Banner"]
-    H -->|false| J["Disable Confirm / Cancel / Delete"]
-    H -->|true after false| K["🔄 Full Data Re-sync"]
-```
-
-**Layers of detection:**
-1. **Browser API**: `navigator.onLine` + `online`/`offline` window events
-2. **Supabase Channel**: A dedicated `connection-monitor` channel subscription tracking `SUBSCRIBED`, `CHANNEL_ERROR`, `TIMED_OUT`, and `CLOSED` states
-3. **Channel-level re-sync**: The `admin-bookings` channel itself triggers a full `fetchBookings()` when it transitions back to `SUBSCRIBED` after a prior disconnect
-
-**When offline (`isSystemOnline = false`):**
-- A prominent red gradient alert banner appears at the top of the viewport
-- All action buttons (Confirm, Cancel, Delete) are disabled with `opacity: 0.45` and `cursor: not-allowed`
-- The status indicator dot in the header pulses red
-
-**When reconnected:**
-- Dashboard automatically calls `fetchBookings()` and `fetchSubscribersCount()` to re-sync stale data
-- A green success toast confirms: "🔄 Network restored. Data re-synced."
+IP is extracted from `x-forwarded-for` → `x-real-ip` → fallback `127.0.0.1`.
 
 ---
 
-## 🚀 Local Setup & Environment Variables
+### Monday Closed Day
 
-### 1. Prerequisites
+The restaurant is closed on Mondays. Enforced at three levels:
+
+1. **Date picker** (`components/Reserve.js`) — Mondays are skipped when generating the 30-day date options array.
+2. **API** (`app/api/bookings/route.js`) — Returns HTTP 400 with a clear message if a Monday date is submitted directly.
+3. **Suggestions filter** (`components/Reserve.js`) — Any Monday in the cross-day suggestion response is filtered out before display.
+
+---
+
+### Frontend Offline Fallback
+
+Two-layer detection in the admin dashboard:
+
+1. `navigator.onLine` + `online`/`offline` window events
+2. Supabase channel status (`SUBSCRIBED`, `CHANNEL_ERROR`, `CLOSED`)
+
+When offline:
+- Red gradient alert banner appears at the top of the viewport
+- All action buttons (Confirm, Cancel, Delete) are disabled
+- Status indicator pulses red
+
+When reconnected:
+- `fetchBookings()` and `fetchSubscribersCount()` re-sync automatically
+- Green toast: "Network restored. Data re-synced."
+
+---
+
+## Local Setup & Environment Variables
+
+### Prerequisites
 - Node.js 18+
-- npm 9+
 - A Supabase project ([supabase.com](https://supabase.com))
 - Cloudflare Turnstile keys ([dash.cloudflare.com](https://dash.cloudflare.com))
 
-### 2. Clone & Install
+### Install
 
 ```bash
 git clone <repository-url>
@@ -350,38 +328,51 @@ cd buenos-mexican
 npm install
 ```
 
-### 3. Environment Configuration
+### Environment Variables
 
-Create a `.env.local` file in the project root:
+Create `.env.local` in the project root:
 
 ```env
-# ── Supabase ──────────────────────────────────────
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-jwt-key
 
-# ── Cloudflare Turnstile ──────────────────────────
-NEXT_PUBLIC_TURNSTILE_SITE_KEY=your-turnstile-site-key       # Public (client-side)
-TURNSTILE_SECRET_KEY=your-turnstile-secret-key               # Private (server-side only)
+# Cloudflare Turnstile
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=your-turnstile-site-key
+TURNSTILE_SECRET_KEY=your-turnstile-secret-key
 
-# ── Notification Pipeline (Edge Function Secrets) ─
+# Notification pipeline (used by Supabase Edge Function)
 RESEND_API_KEY=re_your_resend_api_key
 LINE_CHANNEL_ACCESS_TOKEN=your-line-bot-channel-access-token
 LINE_MANAGER_USER_ID=Uyour-line-manager-user-id
 GOOGLE_SHEET_WEBHOOK_URL=https://script.google.com/macros/s/your-script-id/exec
 
-# ── Site ──────────────────────────────────────────
+# Site URL — used in newsletter unsubscribe links
+# Set to your deployed URL in production (Vercel env vars)
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-> **⚠️ Test Keys**: Cloudflare provides test keys for development:  
-> Site Key: `1x00000000000000000000AA` / Secret: `1x0000000000000000000000000000000AA`  
-> These always pass verification. Replace with production keys before deployment.
+### Run Locally
 
-### 4. Database Setup
+```bash
+npm run dev      # http://localhost:3000
+npm run build    # Production build
+npm run start    # Start production server
+```
 
-Run migration files in your **Supabase SQL Editor** in order (see [Database Migrations](#-database-migrations) below).
+---
 
-### 5. Deploy Edge Function Secrets
+## Database Setup
+
+The full database schema is in a single file: **`supabase/schema.sql`**
+
+To set up a fresh database:
+1. Go to **Supabase Dashboard → SQL Editor**
+2. Paste the contents of `supabase/schema.sql` and run
+
+> **Note:** The `ALTER DATABASE` line near the top of `schema.sql` requires superuser access. Skip it if it errors — run everything else. That line sets the `app.supabase_anon_key` config used by the email trigger function; you can set it manually in **Supabase Dashboard → Settings → Database → Configuration** if needed.
+
+### Deploy Edge Function Secrets
 
 ```bash
 npx supabase secrets set --project-ref your-project-ref \
@@ -391,109 +382,85 @@ npx supabase secrets set --project-ref your-project-ref \
   GOOGLE_SHEET_WEBHOOK_URL="your_url"
 ```
 
-### 6. Run Locally
-
-```bash
-npm run dev          # Development server at http://localhost:3000
-npm run build        # Production build
-npm run start        # Start production server
-```
-
 ---
 
-## 🗄️ Database Migrations
-
-Run these SQL files in your Supabase SQL Editor **in chronological order**:
-
-| File | Purpose |
-|:---|:---|
-| `00_init.sql` | Enable `pg_net` and `pg_cron` extensions; set global config |
-| `01_schema.sql` | Create `tables`, `customers`, `bookings` tables; seed 9 physical tables; add indexes |
-| `02_security.sql` | Enable Row Level Security (RLS); define policies for anon, authenticated, staff/admin |
-| `03_business_logic.sql` | Create `notify_booking_email()` trigger function; create `on_booking_created` trigger |
-| `04_booking_capacity.sql` | Deploy `create_booking` RPC with capacity checking, `FOR UPDATE SKIP LOCKED`, and alternative time generation |
-| `05_newsletter_subscribers.sql` | Create `subscribers` table with RLS policies |
-| `06_anon_booking_management.sql` | Allow anonymous users to manage bookings (development/staging only) |
-| `07_anon_newsletter_management.sql` | Allow anonymous users to manage subscribers (development/staging only) |
-| `08_email_tracking.sql` | Create `email_blasts` and `email_logs` tables for newsletter campaign tracking |
-
-> **Production Note**: Migrations `06` and `07` grant anonymous full access for development convenience. In production, the admin dashboard should be protected behind authentication, and these policies should be removed or restricted.
-
----
-
-## 📂 Project Structure
+## Project Structure
 
 ```
 buenos-mexican/
-├── app/                          # Next.js 15 App Router
+├── app/
 │   ├── admin/
-│   │   └── page.js               # Admin dashboard page (offline detection, tab navigation)
+│   │   ├── page.js               # Admin dashboard (tabs: bookings, newsletter, monitor)
+│   │   └── login/
+│   │       └── page.js           # Admin login page (protected by proxy.js)
 │   ├── api/
-│   │   ├── bookings/
-│   │   │   └── route.js          # POST handler (rate limit → honeypot → Turnstile → RPC)
-│   │   ├── email-webhook/        # Resend webhook for delivery tracking
-│   │   ├── newsletter/           # Newsletter send API
-│   │   └── unsubscribe/          # Newsletter unsubscribe API
-│   ├── menu/                     # Menu explorer page
-│   ├── globals.css               # Design system (HSL variables, typography, layouts)
-│   ├── layout.js                 # Root layout with fonts and metadata
-│   └── page.js                   # Landing page (Hero, Menu, Salsas, Booking, Location)
+│   │   ├── bookings/route.js     # POST: rate limit → honeypot → Turnstile → RPC
+│   │   ├── admin/booking-settings/route.js  # GET/POST: daily cap setting
+│   │   ├── email-webhook/route.js           # Resend delivery event webhook
+│   │   ├── newsletter/send/route.js         # Throttled newsletter campaign send
+│   │   └── unsubscribe/route.js            # Tokenized unsubscribe handler
+│   ├── menu/
+│   │   ├── layout.js             # Menu page layout
+│   │   └── page.js               # Full menu explorer with section nav
+│   ├── globals.css               # Design system (CSS variables, typography, components)
+│   ├── layout.js                 # Root layout (fonts, metadata, structured data)
+│   ├── page.js                   # Landing page
+│   ├── robots.ts                 # Robots.txt
+│   └── sitemap.ts                # Dynamic sitemap
 ├── components/
 │   ├── AdminDashboard.js         # Real-time booking cards, stats, filters, actions
-│   ├── DynamicBackground.js      # Interactive canvas particle trail
-│   ├── Hero.js                   # Landing hero section with CTA
-│   ├── Location.js               # Contact info, Google Maps, operating hours
-│   ├── MenuCategories.js         # Infinite swiper carousel
+│   ├── ClientEffects.js          # Client-only effects wrapper (cursor, scroll progress)
+│   ├── DynamicBackground.js      # Day-based hero background image rotation
+│   ├── FooterSocials.js          # Social media icon links (FB, IG, TikTok)
+│   ├── GrabFooterButton.js       # Grab Food order CTA button
+│   ├── Hero.js                   # Landing hero with animated tagline and CTAs
+│   ├── IntegrityMonitor.js       # Admin system monitor tab (DB health, pipeline logs)
+│   ├── Location.js               # Contact info, Google Maps embed, opening hours
+│   ├── MenuCategories.js         # Auto-scrolling Swiper marquee of menu categories
+│   ├── MenuItemModal.js          # Menu item detail modal (photo, description, price)
 │   ├── Navbar.js                 # Responsive navigation with mobile drawer
-│   ├── NewsletterAdmin.js        # Newsletter campaign management dashboard
-│   ├── NewsletterModal.js        # Newsletter subscription modal
-│   ├── ParticleTrail.js          # Cursor-following particle physics
-│   ├── Reserve.js                # Booking form (Turnstile + Honeypot + Wheel Pickers)
-│   ├── Reviews.js                # Customer testimonials section
-│   ├── Salsas.js                 # 3D tilt cards with coordinate springs
+│   ├── NewsletterAdmin.js        # Newsletter campaign composer and campaign tracker
+│   ├── NewsletterModal.js        # VIP newsletter subscription modal
+│   ├── ParticleTrail.js          # Canvas particle physics engine
+│   ├── PremiumCursor.js          # Custom cursor with particle trail
+│   ├── Reserve.js                # Booking form (wheel pickers, Turnstile, suggestions)
+│   ├── Reviews.js                # Customer testimonials carousel
+│   ├── Salsas.js                 # Reverse-direction Swiper marquee of salsa cards
+│   ├── ScrollProgress.js         # Thin progress bar at top of viewport
 │   ├── SmoothScroll.js           # Lenis smooth scroll wrapper
-│   ├── Specials.js               # Daily specials section
-│   ├── VipFooterButton.js        # Floating VIP action button
-│   └── WheelPicker.js            # iOS-style 3D drum picker (date/time/party)
+│   ├── Specials.js               # Today's specials section
+│   ├── VipFooterButton.js        # Floating VIP newsletter signup button
+│   └── WheelPicker.js            # iOS-style drum picker (date / time / party size)
 ├── lib/
-│   ├── menu-data.js              # Restaurant menu items database
-│   └── supabase.js               # Supabase client singleton
+│   ├── menu-data.js              # Full restaurant menu (items, prices, images, categories)
+│   └── supabase.js               # Supabase browser client (createBrowserClient from @supabase/ssr)
 ├── supabase/
 │   ├── functions/
-│   │   └── send-booking-email/   # Deno Edge Function (Email + LINE + Sheets)
-│   └── migrations/               # 9 SQL migration files (see table above)
+│   │   └── send-booking-email/   # Deno Edge Function: email + LINE + Google Sheets
+│   ├── backend_specs.md          # Backend architecture reference
+│   └── schema.sql                # Complete database schema (single source of truth)
+├── proxy.js                      # Next.js 16 proxy — protects /admin/* routes server-side
 ├── .env.local                    # Environment variables (not committed)
-├── package.json                  # Dependencies and scripts
-└── README.md                     # This file
+├── jsconfig.json                 # Path aliases (@/ → root)
+└── next.config.mjs               # Next.js config
 ```
 
 ---
 
-## 📡 Notification & Sync Pipeline
+## Notification Pipeline
 
-When a booking is created or its status changes, a PostgreSQL trigger fires an asynchronous HTTP POST to a Supabase Edge Function, which distributes notifications and synchronizes data across external channels:
+When a booking is created or its status changes, a PostgreSQL trigger fires an async HTTP POST to a Supabase Edge Function, which distributes notifications across channels:
 
-```mermaid
-graph TD
-    A[Customer submits booking] -->|1. RPC Insert| B[(PostgreSQL)]
-    B -->|2. AFTER INSERT trigger| C[notify_booking_email]
-    C -->|3. pg_net HTTP POST| D[Supabase Edge Function]
-    D -->|4a. Resend API| E[📧 Pending Email]
-    D -->|4b. LINE Push API| F[💬 Manager LINE Chat]
-
-    H[Admin confirms booking] -->|5. Dashboard Update| B
-    B -->|6. AFTER UPDATE trigger| C
-    C -->|7. pg_net HTTP POST| D
-    D -->|8a. Resend API| I[📧 Confirmation Email]
-    D -->|8b. Apps Script POST| G[📊 Google Sheets Row]
+```
+Booking INSERT/UPDATE
+  → AFTER INSERT OR UPDATE trigger: on_booking_created
+      → notify_booking_email() function
+          → pg_net async HTTP POST to Edge Function
+              → Resend API  → customer email (pending / confirmed)
+              → LINE Push   → manager notification
+              → Apps Script → Google Sheets row (confirmed bookings only)
 ```
 
-- **Non-blocking**: `pg_net` makes the HTTP call asynchronously, so the booking insert returns immediately.
-- **Edge Function**: Written in TypeScript/Deno, deployed on Supabase's global edge network.
-- **Resend Email**: Sends status-specific emails to customers (e.g. pending notification upon reservation, confirmation email upon approval).
-- **LINE Bot**: Sends summary cards to the restaurant manager's LINE chat for instant awareness of new booking requests.
-- **Google Sheets**: **Only synchronizes confirmed bookings**. When the administrator approves a booking in the Admin Dashboard, the Edge Function triggers the Google Sheets Webhook to append a row. This completely eliminates execution overhead for pending/unapproved requests.
-
----
-
-Built with ❤️ by the Buenos Mexican Cuisine Development Team.
+- **Non-blocking**: `pg_net` makes the HTTP call asynchronously — the booking insert returns immediately.
+- **Google Sheets**: Only syncs confirmed bookings to avoid polluting the sheet with unreviewed requests.
+- **Edge Function**: TypeScript/Deno, deployed on Supabase's global edge network.
