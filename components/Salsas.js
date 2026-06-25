@@ -79,14 +79,14 @@ export default function Salsas() {
           loop={true}
           freeMode={true}
           speed={4000}
-          autoplay={{ delay: 0, disableOnInteraction: false, pauseOnMouseEnter: true, reverseDirection: true }}
+          autoplay={{ delay: 0, disableOnInteraction: false, pauseOnMouseEnter: false, reverseDirection: true }}
           grabCursor={true}
           breakpoints={{ 640: { slidesPerView: 2.2 }, 1024: { slidesPerView: 4 } }}
           className="salsa-swiper"
         >
           {salsas.map((salsa) => (
             <SwiperSlide key={salsa.name}>
-              <a href="/menu" className="salsa-card">
+              <div className="salsa-card">
                 {/* Photo band (top) */}
                 <div className="salsa-card-photo">
                   <Image
@@ -120,7 +120,7 @@ export default function Salsas() {
                     {salsa.desc}
                   </p>
                 </div>
-              </a>
+              </div>
             </SwiperSlide>
           ))}
         </Swiper>
@@ -133,7 +133,6 @@ export default function Salsas() {
           flex-direction: column;
           border-radius: 24px;
           overflow: hidden;
-          cursor: pointer;
           border: 2px dashed var(--secondary);
           box-shadow: 0 8px 24px rgba(62, 39, 35, 0.12);
           background: rgba(62, 39, 35, 0.96);
