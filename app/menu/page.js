@@ -3,6 +3,7 @@
 import SmoothScroll from '@/components/SmoothScroll';
 import Navbar from '@/components/Navbar';
 import MenuItemModal from '@/components/MenuItemModal';
+import GrabFooterButton from '@/components/GrabFooterButton';
 import Image from 'next/image';
 import { useState, useCallback, memo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
@@ -49,8 +50,12 @@ function SectionNavBar({ activeSection }) {
 
   useEffect(() => {
     if (!scrollRef.current || !activeSection) return;
-    const pill = scrollRef.current.querySelector(`[data-slug="${activeSection}"]`);
-    if (pill) pill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    const container = scrollRef.current;
+    const pill = container.querySelector(`[data-slug="${activeSection}"]`);
+    if (!pill) return;
+    // Direct scrollLeft assignment instead of scrollIntoView — Lenis intercepts scrollIntoView
+    // on sticky elements and scrolls the window to top, causing the page-jump bug.
+    container.scrollLeft = pill.offsetLeft - container.offsetWidth / 2 + pill.offsetWidth / 2;
   }, [activeSection]);
 
   return (
@@ -413,9 +418,7 @@ export default function MenuPage() {
               <a href="https://www.tiktok.com/@buenosmexican" target="_blank" rel="noopener noreferrer" className="footer-social-link">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.17-2.81-.6-4.03-1.42-.88-.65-1.59-1.47-2.11-2.42v10.17c.03 2.1-.39 4.26-1.89 5.81-1.5 1.55-3.67 2.39-5.87 2.39-2.2 0-4.37-.84-5.87-2.39-1.5-1.55-1.92-3.71-1.89-5.81.03-2.1.45-4.26 1.95-5.81 1.5-1.55 3.67-2.39 5.87-2.39.2 0 .4 0 .6.02v4.03c-.2-.02-.4-.02-.6-.02-1.1 0-2.19.42-2.94 1.19-.75.77-.96 1.85-.98 2.9-.02 1.05.19 2.13.94 2.9.75.77 1.84 1.19 2.94 1.19 1.1 0 2.19-.42 2.94-1.19.75-.77.96-1.85.98-2.9V0h.06z"/></svg>
               </a>
-              <a href="https://r.grab.com/o/Zn6bI3Ar" target="_blank" rel="noopener noreferrer" className="footer-social-link" style={{ backgroundColor: '#00B14F', color: '#fff', borderRadius: '50px', padding: '0.4rem 1.2rem', fontSize: '0.75rem', fontWeight: '800', border: 'none', marginLeft: '0.5rem' }}>
-                ORDER ON GRAB
-              </a>
+              <GrabFooterButton />
             </div>
           </div>
         </footer>

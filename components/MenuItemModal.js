@@ -72,13 +72,15 @@ export default function MenuItemModal({ item, onClose }) {
             transition={{ duration: 0.4, type: 'spring', bounce: 0.25 }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close button */}
-            <button className="menu-modal-close" onClick={onClose} aria-label="Close modal">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
+            {/* Sticky close row — stays visible even when modal content is scrolled */}
+            <div className="menu-modal-close-row">
+              <button className="menu-modal-close" onClick={onClose} aria-label="Close modal">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
 
             {/* Image */}
             {item.image && (
