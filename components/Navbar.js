@@ -139,10 +139,11 @@ export default function Navbar() {
         </ul>
 
         {/* Mobile Menu Button */}
-        <button className="mobile-menu-btn flex flex-col gap-1.5 z-50 relative ml-auto" onClick={() => setIsOpen(!isOpen)} aria-label="Toggle navigation menu" aria-expanded={isOpen} style={{ padding: '0.75rem', minWidth: '44px', minHeight: '44px', justifyContent: 'center', alignItems: 'center' }}>
+        <button className="mobile-menu-btn z-50 relative ml-auto" onClick={() => setIsOpen(!isOpen)} aria-label="Toggle navigation menu" aria-expanded={isOpen} style={{ padding: '0.5rem 0.75rem', minWidth: '44px', minHeight: '44px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '3px' }}>
           <span style={{ display: 'block', width: '28px', height: '3px', backgroundColor: '#fff', transition: '0.3s', transform: isOpen ? 'rotate(45deg) translate(6px, 6px)' : 'none' }}></span>
           <span style={{ display: 'block', width: '28px', height: '3px', backgroundColor: '#fff', transition: '0.3s', opacity: isOpen ? 0 : 1 }}></span>
           <span style={{ display: 'block', width: '28px', height: '3px', backgroundColor: '#fff', transition: '0.3s', transform: isOpen ? 'rotate(-45deg) translate(7px, -7px)' : 'none' }}></span>
+          <span style={{ display: 'block', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.08em', color: '#fff', textTransform: 'uppercase', marginTop: '3px', transition: '0.3s', opacity: isOpen ? 0 : 1 }}>Menu</span>
         </button>
       </div>
 
