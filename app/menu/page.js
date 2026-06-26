@@ -348,6 +348,17 @@ export default function MenuPage() {
   const handleCloseModal = useCallback(() => setSelectedItem(null), []);
 
   useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(hash);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  useEffect(() => {
     const observers = [];
     menuData.forEach(section => {
       const el = document.getElementById(section.slug);
