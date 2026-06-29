@@ -142,6 +142,15 @@ const baseStyles = `
   }
 `;
 
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 // ─── GET: Show confirmation page (no DB changes) ────────────────────
 export async function GET(request) {
   try {
@@ -175,7 +184,7 @@ export async function GET(request) {
               </div>
               <h1>Unsubscribe from Newsletter?</h1>
               <p>
-                You're about to unsubscribe <strong style="color: #3E2723;">${email}</strong> 
+                You're about to unsubscribe <strong style="color: #3E2723;">${escapeHtml(email)}</strong>
                 from all Buenos Mexican Cuisine marketing emails.
               </p>
               <p style="color: #B09080; font-size: 13px; margin-top: 4px;">

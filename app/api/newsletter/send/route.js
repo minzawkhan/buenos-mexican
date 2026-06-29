@@ -183,13 +183,6 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function POST(request) {
   try {
     const authHeader = request.headers.get('Authorization');
-
-    // Check if token is a valid 3-part JWT
-    const isValidJwt = (t) => {
-      if (!t) return false;
-      return t.split('.').length === 3;
-    };
-
     const token = authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : '';
 
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -197,14 +190,16 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Database environment variables are not configured.' }, { status: 500 });
     }
 
-    // Create Supabase client
-    let supabase;
-    if (isValidJwt(token)) {
-      supabase = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: `Bearer ${token}` } }
-      });
-    } else {
-      supabase = createClient(supabaseUrl, supabaseAnonKey);
+    // Verify the caller is an authenticated admin
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { subject, htmlContent } = await request.json();
